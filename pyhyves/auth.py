@@ -60,6 +60,18 @@ class RequestTokenResponse(BaseModel):
 
 
 class PasswordAuth:
+    """Logs in with a username and password.
+
+    This mimics the login flow from the web app, which uses OAuth 2.0 with PKCE. Normally, a client is sent to
+    https://auth.hyves.nl/authorize, which runs FusionAuth and returns a login form. It contains some hidden fields
+    that are normally forwarded in a POST request to the same endpoint, but it seems we don't need to send those along,
+    and we don't need to read anything from the login page.
+
+    So to log in, we (1) start with a POST request to https://auth.hyves.nl/oauth2/authorize with a username, password
+    and our own OAuth code challenge, (2) follow its redirects, and (3) finally intercept the authorization code from
+    query parameters of the final redirect. We then (4) use that to retrieve an access and refresh token from
+    https://auth.hyves.nl/oauth2/token."""
+
     def __init__(self, http: AsyncClient, credentials: PasswordCredentials) -> None:
         self._http = http
         self._login_id = credentials.login_id
