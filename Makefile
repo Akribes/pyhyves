@@ -1,7 +1,7 @@
 .PHONY: test style verify format
 
 test:
-	pytest --cov=pyhyves tests
+	pytest -s --cov=pyhyves tests
 
 style:
 	mypy --strict pyhyves

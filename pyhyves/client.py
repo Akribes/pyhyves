@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import AsyncGenerator, Mapping
 from typing import Any
 
 from httpx import AsyncClient, Response
@@ -9,7 +9,7 @@ from pyhyves import HyvesAuthException
 from pyhyves.auth import (
     Auth,
 )
-from pyhyves.config import HYVES_API_URL
+from pyhyves.config import BATCHED_REQUEST_LIMIT, HYVES_API_URL
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,10 @@ class _HyvesResponse(CamelCaseModel):
 
 class _BatchedResult(CamelCaseModel):
     items: list[Any]
-    limit: int
     cursor: str | None
-    total: int | None
     has_next: bool
+    # limit: int
+    # total: int | None
 
 
 class HyvesAPIException(RuntimeError):
@@ -74,11 +74,50 @@ class HyvesClient:
         result = response_type.model_validate(formatted.result)
         return result
 
+    async def get_iter[T: BaseModel](
+        self,
+        endpoint: str,
+        *,
+        response_type: type[T],
+        params: Mapping[str, str] | None = None,
+        auth_required: bool = True
+    ) -> AsyncGenerator[T]:
+        """Lazily load items from an endpoint.
+
+        Some endpoints (comments, groups, etc.) return a list of items in pages. This method returns an iterator that
+        requests batches of items as needed.
+
+        :param endpoint: The endpoint to load items from
+        :param response_type: The type to validate against
+        :param params: Query parameters to send with the request. ``limit`` and ``cursor`` are overwritten.
+        :param auth_required: Whether to include the Authorization header
+        :return: Validated items
+        """
+
+        params = {**params} if params else {}
+        params["limit"] = str(BATCHED_REQUEST_LIMIT)
+        params.pop("cursor", None)
+        has_next = True
+
+        while has_next:
+            batch = await self.get(
+                endpoint=endpoint,
+                response_type=_BatchedResult,
+                params=params,
+                auth_required=auth_required,
+            )
+
+            for x in batch.items:
+                yield response_type.model_validate(x)
+
+            has_next = batch.has_next
+            params["cursor"] = batch.cursor
+
     async def request(
         self,
+        endpoint: str,
         *,
         method: str,
-        endpoint: str,
         params: Mapping[str, str] | None,
         auth_required: bool = True
     ) -> Response:
