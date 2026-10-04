@@ -3,6 +3,7 @@ from typing import assert_never
 
 import httpx
 
+from pyhyves.api.client import HyvesClient
 from pyhyves.auth import (
     Auth,
     Credentials,
@@ -11,7 +12,6 @@ from pyhyves.auth import (
     TokenAuth,
     TokenCredentials,
 )
-from pyhyves.client import HyvesClient
 
 logger = logging.getLogger(__name__)
 

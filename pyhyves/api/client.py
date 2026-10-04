@@ -5,8 +5,7 @@ from typing import Any
 from httpx import AsyncClient
 from pydantic import BaseModel, ConfigDict, alias_generators
 
-from pyhyves import HyvesAuthException
-from pyhyves.api import (
+from pyhyves.api.schema import (
     Account,
     ClientAccount,
     ClientAccountPatchParams,
@@ -35,6 +34,7 @@ from pyhyves.api import (
 )
 from pyhyves.auth import (
     Auth,
+    HyvesAuthException,
 )
 from pyhyves.config import BATCHED_REQUEST_LIMIT, HYVES_API_URL
 

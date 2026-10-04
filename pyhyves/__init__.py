@@ -1,10 +1,11 @@
+from pyhyves.api.client import HyvesAPIException
+
 from .auth import (
     Credentials,
     HyvesAuthException,
     PasswordCredentials,
     TokenCredentials,
 )
-from .client import HyvesAPIException
 from .pyhyves import Pyhyves
 
 __all__ = (

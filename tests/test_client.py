@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from pyhyves.client import HTTPClient
+from pyhyves.api.client import HTTPClient
 
 
 class Dummy(BaseModel):
