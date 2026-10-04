@@ -12,7 +12,6 @@ from pyhyves.auth import (
     TokenCredentials,
 )
 from pyhyves.client import HyvesClient
-from pyhyves.models import Account
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +21,6 @@ class Pyhyves:
 
     def __init__(self, credentials: Credentials | None = None) -> None:
         self._client = self._build_client(credentials=credentials)
-
-    async def current_user(self) -> Account:
-        """Returns the current user's account information."""
-        return await self._client.get("/v1/account/me", response_type=Account)
 
     @staticmethod
     def _build_client(credentials: Credentials | None) -> HyvesClient:

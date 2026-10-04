@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from pyhyves.client import HyvesClient
+from pyhyves.client import HTTPClient
 
 
 class Dummy(BaseModel):
@@ -23,13 +23,13 @@ TEST_RESPONSE = {
 }
 
 
-class TestClient:
+class TestHTTPClient:
     @pytest.mark.asyncio
     async def test_get_unauthenticated_request(self, respx_mock):
         respx_mock.get(
             "https://api.hyves.nl/v1/fake-endpoint",
             params={
-                "some param": "some value",
+                "id": 1,
             },
         ).respond(
             status_code=200,
@@ -37,11 +37,11 @@ class TestClient:
         )
 
         async with httpx.AsyncClient() as http:
-            client = HyvesClient(client=http)
+            client = HTTPClient(client=http)
             result = await client.get(
                 "/v1/fake-endpoint",
                 response_type=NestedDummy,
-                params={"some param": "some value"},
+                params=Dummy(id=1),
                 auth_required=False
             )
 
@@ -63,7 +63,7 @@ class TestClient:
         auth.get_new_token.return_value = "123456"
 
         async with httpx.AsyncClient() as http:
-            client = HyvesClient(
+            client = HTTPClient(
                 auth=auth,
                 client=http
             )
@@ -77,7 +77,7 @@ class TestClient:
             "https://api.hyves.nl/v1/fake-endpoint",
             params__eq={
                 "limit": "20",
-                "some param": "some value",
+                "id": 1,
             }
         ).respond(
             status_code=200,
@@ -100,7 +100,7 @@ class TestClient:
             params__eq={
                 "cursor": "a",
                 "limit": "20",
-                "some param": "some value",
+                "id": 1,
             }
         ).respond(
             status_code=200,
@@ -120,13 +120,13 @@ class TestClient:
         )
 
         async with httpx.AsyncClient() as http:
-            client = HyvesClient(client=http)
+            client = HTTPClient(client=http)
 
             results = []
             async for x in client.get_iter(
                 "/v1/fake-endpoint",
                 response_type=Dummy,
-                params={"some param": "some value", "cursor": "should be ignored"},
+                params=Dummy(id=1),
                 auth_required=False
             ):
                 results.append(x.id)
