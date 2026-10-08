@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import Any
 
 from httpx import AsyncClient
@@ -31,6 +31,8 @@ from pyhyves.api.schema import (
     TimelineEntry,
     UnlikeCommentParams,
     UnlikePostParams,
+    WallPostApproveParams,
+    WallPostRejectParams,
 )
 from pyhyves.auth import (
     Auth,
@@ -169,7 +171,7 @@ class HTTPClient:
         params: BaseModel | None = None,
         batch_size: int = BATCHED_REQUEST_LIMIT,
         auth_required: bool = True
-    ) -> AsyncGenerator[T]:
+    ) -> AsyncIterator[T]:
         """Lazily load items from an endpoint.
 
         Some endpoints (comments, groups, etc.) return a list of items in pages. This method returns an iterator that
@@ -298,8 +300,10 @@ class HyvesClient:
             data=params,  # TODO check
         )
 
-    def get_client_timeline(self) -> AsyncGenerator[TimelineEntry]:
-        return self._client.get_iter("/v1/timeline", response_type=TimelineEntry)
+    def get_client_timeline(self, *, batch_size: int = BATCHED_REQUEST_LIMIT) -> AsyncIterator[TimelineEntry]:
+        return self._client.get_iter(
+            "/v1/timeline", response_type=TimelineEntry, batch_size=batch_size
+        )
 
     # endregion
 
@@ -312,11 +316,17 @@ class HyvesClient:
 
     # region Groups
 
-    def get_sponsored_groups(self) -> AsyncGenerator[Group]:
-        return self._client.get_iter("/v1/groups/sponsored", response_type=Group)
+    def get_sponsored_groups(
+        self, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[Group]:
+        return self._client.get_iter(
+            "/v1/groups/sponsored", response_type=Group, batch_size=batch_size
+        )
 
-    def get_client_groups(self) -> AsyncGenerator[Group]:
-        return self._client.get_iter("/v1/groups", response_type=Group)
+    def get_client_groups(
+        self, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[Group]:
+        return self._client.get_iter("/v1/groups", response_type=Group, batch_size=batch_size)
 
     async def get_group(self, group_id: int) -> Group:
         return await self._client.get(f"/v1/groups/{group_id}", response_type=Group)
@@ -330,8 +340,12 @@ class HyvesClient:
     async def delete_group(self, group_id: int) -> None:
         await self._client.delete(f"/v1/groups/{group_id}", response_type=DeleteResponse)
 
-    def get_group_members(self, group_id: int) -> AsyncGenerator[GroupMember]:
-        return self._client.get_iter(f"/v1/groups/{group_id}/members", response_type=GroupMember)
+    def get_group_members(
+        self, group_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[GroupMember]:
+        return self._client.get_iter(
+            f"/v1/groups/{group_id}/members", response_type=GroupMember, batch_size=batch_size
+        )
 
     async def get_group_user_options(self, group_id: int) -> GroupUserOptions:
         return await self._client.get(f"/v1/groups/{group_id}/user-options", response_type=GroupUserOptions)
@@ -355,20 +369,28 @@ class HyvesClient:
     async def create_timeline_post(self, params: PostCreateParams) -> Post:
         return await self._client.post("/v1/posts", response_type=Post, data=params)
 
-    def get_wall_posts(self, account_id: int) -> AsyncGenerator[Post]:
-        return self._client.get_iter(f"/v1/wall/{account_id}/posts", response_type=Post)
+    def get_wall_posts(
+        self, account_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[Post]:
+        return self._client.get_iter(
+            f"/v1/wall/{account_id}/posts", response_type=Post, batch_size=batch_size
+        )
 
     async def create_wall_post(self, account_id: int, params: PostCreateParams) -> Post:
         return await self._client.post(f"/v1/wall/{account_id}/posts", response_type=Post, data=params)
 
-    async def approve_wall_post(self, post_id: int, params: PostCreateParams) -> Post:
+    async def approve_wall_post(self, post_id: int, params: WallPostApproveParams) -> Post:
         return await self._client.post(f"/v1/wall/posts/{post_id}/approve", response_type=Post, data=params)
 
-    async def reject_wall_post(self, post_id: int, params: PostCreateParams) -> Post:
+    async def reject_wall_post(self, post_id: int, params: WallPostRejectParams) -> Post:
         return await self._client.post(f"/v1/wall/posts/{post_id}/reject", response_type=Post, data=params)
 
-    def get_group_posts(self, group_id: int) -> AsyncGenerator[Post]:
-        return self._client.get_iter(f"/v1/groups/{group_id}/posts", response_type=Post)
+    def get_group_posts(
+        self, group_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[Post]:
+        return self._client.get_iter(
+            f"/v1/groups/{group_id}/posts", response_type=Post, batch_size=batch_size
+        )
 
     async def create_group_post(self, group_id: int, params: PostCreateParams) -> Post:
         return await self._client.post(f"/v1/groups/{group_id}/posts", response_type=Post, data=params)
@@ -380,8 +402,12 @@ class HyvesClient:
 
     # region Comments
 
-    def get_comments(self, post_id: int) -> AsyncGenerator[Comment]:
-        return self._client.get_iter(f"/v1/posts/{post_id}/comments", response_type=Comment)
+    def get_comments(
+        self, post_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[Comment]:
+        return self._client.get_iter(
+            f"/v1/posts/{post_id}/comments", response_type=Comment, batch_size=batch_size
+        )
 
     async def create_comment(self, post_id: int, params: CommentCreateParams) -> Comment:
         return await self._client.post(f"/v1/posts/{post_id}/comments", response_type=Comment, data=params)
@@ -411,14 +437,23 @@ class HyvesClient:
 
     # region Friends
 
-    def get_client_friends(self) -> AsyncGenerator[Friend]:
-        return self._client.get_iter("/v1/friends", response_type=Friend)
+    def get_client_friends(
+        self, *, batch_size: int = BATCHED_REQUEST_LIMIT
+    ) -> AsyncIterator[Friend]:
+        return self._client.get_iter("/v1/friends", response_type=Friend, batch_size=batch_size)
 
     async def delete_friend(self, account_id: int) -> None:
         await self._client.delete(f"/v1/friends/{account_id}", response_type=DeleteResponse)
 
-    def get_client_friend_requests(self, params: FriendRequestsParams) -> AsyncGenerator[FriendRequest]:
-        return self._client.get_iter("/v1/friends/requests", response_type=FriendRequest, params=params, batch_size=4)
+    def get_client_friend_requests(
+        self,
+        params: FriendRequestsParams,
+        *,
+        batch_size: int = 4,
+    ) -> AsyncIterator[FriendRequest]:
+        return self._client.get_iter(
+            "/v1/friends/requests", response_type=FriendRequest, params=params, batch_size=batch_size
+        )
 
     async def create_friend_request(self, params: FriendRequestCreateParams) -> FriendRequest:
         return await self._client.post("/v1/friends/requests", response_type=FriendRequest, data=params)

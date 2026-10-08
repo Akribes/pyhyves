@@ -5,7 +5,7 @@ Pydantic models representing API inputs and responses
 from enum import StrEnum, auto
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Color = str
 
@@ -40,7 +40,7 @@ class ClientAccount(BaseModel):
     backgroundColor: Color | None = None
     gender: str | None  # TODO enum
     jobTitle: str | None = None
-    interests: list[str] = []
+    interests: list[str] = Field(default_factory=list)
     slug: str
     unreadNotificationCount: int
 
@@ -175,7 +175,7 @@ class Post(BaseModel):
     hasTags: bool
     likeCount: int
     commentCount: int
-    recentLikerNames: list[str] = []
+    recentLikerNames: list[str] = Field(default_factory=list)
     createdAt: Any
     updatedAt: Any
     lastComment: Any | None = None
@@ -197,7 +197,7 @@ class Comment(BaseModel):
     updatedAt: Any
     likedByMe: bool
     likeCount: int
-    recentLikerNames: list[str] = []
+    recentLikerNames: list[str] = Field(default_factory=list)
     author: PartialAccount
     hasReplies: bool
 
