@@ -52,13 +52,13 @@ class ClientAccountPatchParams(BaseModel):
     backgroundColor: Color | None = None
 
 class FriendshipStatus(StrEnum):
-    PENDING = auto()
-    FRIENDS = auto()
-    NONE = auto()
+    PENDING = "pending"
+    FRIENDS = "friends"
+    NONE = "none"
 
 class FriendRequestDirection(StrEnum):
-    INCOMING = auto()
-    OUTGOING = auto()
+    INCOMING = "incoming"
+    OUTGOING = "outgoing"
 
 class PartialFriendRequest(BaseModel):
     id: int
@@ -156,7 +156,7 @@ class WallVisibility(StrEnum):
 class Post(BaseModel):
     id: int
     authorUserId: int
-    postType: PostType | str
+    postType: PostType
     content: str
     link: str | None = None
     linkPreview: Any | None = None
@@ -228,7 +228,7 @@ class Group(BaseModel):
     banner: str | None = None
     backgroundHtml: str | None = None
     visibility: GroupVisibility | str
-    roleToPost: GroupRole | str
+    roleToPost: GroupRole
     joinInfo: Any | None = None
     location: Location | None = None
     createdAt: Any
@@ -238,7 +238,7 @@ class Group(BaseModel):
     memberCount: int
     isOwner: bool
     # joinedAt
-    memberRole: GroupRole | str | None = None  # Only present if client is a member
+    memberRole: GroupRole | None = None  # Only present if client is a member
     canPost: bool | None = None  # Only present if client is a member
     verified: bool | None = None  # Omitted when updating a group
 
@@ -268,8 +268,8 @@ class GroupMember(BaseModel):
     groupId: int
     userId: int
     role: GroupRole
-    # joinedAt: str
-    # updatedAt: str
+    joinedAt: Any
+    updatedAt: Any
     image: str | None = None
     banner: str | None = None
     name: str

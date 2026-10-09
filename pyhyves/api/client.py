@@ -1,44 +1,83 @@
 import logging
 from collections.abc import AsyncIterator, Mapping
-from typing import Any
+from typing import Any, assert_never
 
 from httpx import AsyncClient
 from pydantic import BaseModel, ConfigDict, alias_generators
 
-from pyhyves.api.schema import (
+from pyhyves.account import (
     Account,
-    ClientAccount,
+    AccountPreview,
+    AccountRef,
+)
+from pyhyves.api.schema import (
+    Account as AccountPayload,
+)
+from pyhyves.api.schema import (
+    ClientAccount as ClientAccountPayload,
+)
+from pyhyves.api.schema import (
     ClientAccountPatchParams,
-    Comment,
     CommentCreateParams,
     DeleteResponse,
-    Friend,
-    FriendRequest,
     FriendRequestCreateParams,
     FriendRequestsParams,
-    Group,
     GroupCreateParams,
     GroupJoinParams,
-    GroupMember,
     GroupPatchParams,
-    GroupUserOptions,
     GroupUserOptionsUpdateParams,
     LikeCommentParams,
     LikePostParams,
-    Post,
     PostCreateParams,
     PublicUsersCount,
-    TimelineEntry,
     UnlikeCommentParams,
     UnlikePostParams,
     WallPostApproveParams,
     WallPostRejectParams,
+)
+from pyhyves.api.schema import (
+    Comment as CommentPayload,
+)
+from pyhyves.api.schema import (
+    Friend as FriendPayload,
+)
+from pyhyves.api.schema import (
+    FriendRequest as FriendRequestPayload,
+)
+from pyhyves.api.schema import (
+    Group as GroupPayload,
+)
+from pyhyves.api.schema import (
+    GroupMember as GroupMemberPayload,
+)
+from pyhyves.api.schema import (
+    GroupUserOptions as GroupUserOptionsPayload,
+)
+from pyhyves.api.schema import (
+    PartialAccount as PartialAccountPayload,
+)
+from pyhyves.api.schema import (
+    PartialGroup as PartialGroupPayload,
+)
+from pyhyves.api.schema import (
+    Post as PostPayload,
+)
+from pyhyves.api.schema import (
+    TimelineEntry as TimelineEntryPayload,
 )
 from pyhyves.auth import (
     Auth,
     HyvesAuthException,
 )
 from pyhyves.config import BATCHED_REQUEST_LIMIT, HYVES_API_URL
+from pyhyves.group import Group, GroupMember, GroupPreview, GroupRef
+from pyhyves.post import (
+    Comment,
+    GroupPost,
+    PostRef,
+    TimelinePost,
+    WallPost,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,11 +130,11 @@ class HTTPClient:
 
         If authentication is needed, the token is refreshed if necessary.
 
-        :param params_override:
         :param endpoint: Endpoint
         :param method: HTTP request method
         :param response_type: Pydantic model to validate the response against
         :param params: Request parameters
+        :param params_override: Parameters to override
         :param params_override: Query parameters overwritten in the Pydantic model
         :param data: Request JSON body
         :param auth_required: Whether to include Authorization header
@@ -107,7 +146,7 @@ class HTTPClient:
 
         if auth_required:
             if not self._auth:
-                raise HyvesAuthException("No credentials provided but auth_required is True")
+                raise HyvesAuthException("This method requires authentication, but no credentials were provided")
 
             if not self._token:
                 self._token = await self._auth.get_new_token()
@@ -147,14 +186,6 @@ class HTTPClient:
         params: BaseModel | None = None,
         auth_required: bool = True
     ) -> T:
-        """Do a GET request and validate the response.
-
-        :param endpoint: API endpoint
-        :param response_type: Pydantic model to validate the response against
-        :param params: Query parameters to send with the request
-        :param auth_required: Whether to include the Authorization header
-        :return: Validated response
-        """
         return await self.request(
             endpoint=endpoint,
             method="GET",
@@ -272,7 +303,7 @@ class HTTPClient:
         )
 
 class HyvesClient:
-    """Methods for accessing API endpoints."""
+    """API endpoint definitions and builder methods for Pyhyves types"""
 
     def __init__(self, *, auth: Auth | None = None, client: AsyncClient | None = None) -> None:
         self._client = HTTPClient(auth=auth, client=client)
@@ -290,27 +321,27 @@ class HyvesClient:
 
     # region Client account
 
-    async def get_client_account(self) -> ClientAccount:
-        return await self._client.get("/v1/account/me", response_type=ClientAccount)
+    async def get_client_account(self) -> ClientAccountPayload:
+        return await self._client.get("/v1/account/me", response_type=ClientAccountPayload)
 
-    async def update_client_account(self, params: ClientAccountPatchParams) -> ClientAccount:
+    async def update_client_account(self, params: ClientAccountPatchParams) -> ClientAccountPayload:
         return await self._client.patch(
             "/v1/account/me",
-            response_type=ClientAccount,
-            data=params,  # TODO check
+            response_type=ClientAccountPayload,
+            data=params,
         )
 
-    def get_client_timeline(self, *, batch_size: int = BATCHED_REQUEST_LIMIT) -> AsyncIterator[TimelineEntry]:
+    def get_client_timeline(self, *, batch_size: int = BATCHED_REQUEST_LIMIT) -> AsyncIterator[TimelineEntryPayload]:
         return self._client.get_iter(
-            "/v1/timeline", response_type=TimelineEntry, batch_size=batch_size
+            "/v1/timeline", response_type=TimelineEntryPayload, batch_size=batch_size
         )
 
     # endregion
 
     # region Accounts
 
-    async def get_account(self, account_id: int) -> Account:
-        return await self._client.get(f"/v1/account/{account_id}", response_type=Account)
+    async def get_account(self, account_id: int) -> AccountPayload:
+        return await self._client.get(f"/v1/account/{account_id}", response_type=AccountPayload)
 
     # endregion
 
@@ -318,43 +349,43 @@ class HyvesClient:
 
     def get_sponsored_groups(
         self, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[Group]:
+    ) -> AsyncIterator[GroupPayload]:
         return self._client.get_iter(
-            "/v1/groups/sponsored", response_type=Group, batch_size=batch_size
+            "/v1/groups/sponsored", response_type=GroupPayload, batch_size=batch_size
         )
 
     def get_client_groups(
         self, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[Group]:
-        return self._client.get_iter("/v1/groups", response_type=Group, batch_size=batch_size)
+    ) -> AsyncIterator[GroupPayload]:
+        return self._client.get_iter("/v1/groups", response_type=GroupPayload, batch_size=batch_size)
 
-    async def get_group(self, group_id: int) -> Group:
-        return await self._client.get(f"/v1/groups/{group_id}", response_type=Group)
+    async def get_group(self, group_id: int) -> GroupPayload:
+        return await self._client.get(f"/v1/groups/{group_id}", response_type=GroupPayload)
 
-    async def create_group(self, params: GroupCreateParams) -> Group:
-        return await self._client.post("/v1/groups", response_type=Group, data=params)
+    async def create_group(self, params: GroupCreateParams) -> GroupPayload:
+        return await self._client.post("/v1/groups", response_type=GroupPayload, data=params)
 
-    async def update_group(self, group_id: int, params: GroupPatchParams) -> Group:
-        return await self._client.patch(f"/v1/groups/{group_id}", response_type=Group, data=params)
+    async def update_group(self, group_id: int, params: GroupPatchParams) -> GroupPayload:
+        return await self._client.patch(f"/v1/groups/{group_id}", response_type=GroupPayload, data=params)
 
     async def delete_group(self, group_id: int) -> None:
         await self._client.delete(f"/v1/groups/{group_id}", response_type=DeleteResponse)
 
     def get_group_members(
         self, group_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[GroupMember]:
+    ) -> AsyncIterator[GroupMemberPayload]:
         return self._client.get_iter(
-            f"/v1/groups/{group_id}/members", response_type=GroupMember, batch_size=batch_size
+            f"/v1/groups/{group_id}/members", response_type=GroupMemberPayload, batch_size=batch_size
         )
 
-    async def get_group_user_options(self, group_id: int) -> GroupUserOptions:
-        return await self._client.get(f"/v1/groups/{group_id}/user-options", response_type=GroupUserOptions)
+    async def get_group_user_options(self, group_id: int) -> GroupUserOptionsPayload:
+        return await self._client.get(f"/v1/groups/{group_id}/user-options", response_type=GroupUserOptionsPayload)
 
-    async def update_group_user_options(self, group_id: int, params: GroupUserOptionsUpdateParams) -> GroupUserOptions:
-        return await self._client.put(f"/v1/groups/{group_id}/user-options", response_type=GroupUserOptions, data=params)
+    async def update_group_user_options(self, group_id: int, params: GroupUserOptionsUpdateParams) -> GroupUserOptionsPayload:
+        return await self._client.put(f"/v1/groups/{group_id}/user-options", response_type=GroupUserOptionsPayload, data=params)
 
-    async def join_group(self, group_id: int, params: GroupJoinParams) -> GroupMember:
-        return await self._client.post(f"/v1/groups/{group_id}/join", response_type=GroupMember, data=params)
+    async def join_group(self, group_id: int, params: GroupJoinParams) -> GroupMemberPayload:
+        return await self._client.post(f"/v1/groups/{group_id}/join", response_type=GroupMemberPayload, data=params)
 
     async def leave_group(self, group_id: int) -> None:
         await self._client.delete(f"/v1/groups/{group_id}/leave", response_type=DeleteResponse)
@@ -363,37 +394,37 @@ class HyvesClient:
 
     # region Posts
 
-    async def get_post(self, post_id: int) -> Post:
-        return await self._client.get(f"/v1/posts/{post_id}", response_type=Post)
+    async def get_post(self, post_id: int) -> PostPayload:
+        return await self._client.get(f"/v1/posts/{post_id}", response_type=PostPayload)
 
-    async def create_timeline_post(self, params: PostCreateParams) -> Post:
-        return await self._client.post("/v1/posts", response_type=Post, data=params)
+    async def create_timeline_post(self, params: PostCreateParams) -> PostPayload:
+        return await self._client.post("/v1/posts", response_type=PostPayload, data=params)
 
     def get_wall_posts(
         self, account_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[Post]:
+    ) -> AsyncIterator[PostPayload]:
         return self._client.get_iter(
-            f"/v1/wall/{account_id}/posts", response_type=Post, batch_size=batch_size
+            f"/v1/wall/{account_id}/posts", response_type=PostPayload, batch_size=batch_size
         )
 
-    async def create_wall_post(self, account_id: int, params: PostCreateParams) -> Post:
-        return await self._client.post(f"/v1/wall/{account_id}/posts", response_type=Post, data=params)
+    async def create_wall_post(self, account_id: int, params: PostCreateParams) -> PostPayload:
+        return await self._client.post(f"/v1/wall/{account_id}/posts", response_type=PostPayload, data=params)
 
-    async def approve_wall_post(self, post_id: int, params: WallPostApproveParams) -> Post:
-        return await self._client.post(f"/v1/wall/posts/{post_id}/approve", response_type=Post, data=params)
+    async def approve_wall_post(self, post_id: int, params: WallPostApproveParams) -> PostPayload:
+        return await self._client.post(f"/v1/wall/posts/{post_id}/approve", response_type=PostPayload, data=params)
 
-    async def reject_wall_post(self, post_id: int, params: WallPostRejectParams) -> Post:
-        return await self._client.post(f"/v1/wall/posts/{post_id}/reject", response_type=Post, data=params)
+    async def reject_wall_post(self, post_id: int, params: WallPostRejectParams) -> PostPayload:
+        return await self._client.post(f"/v1/wall/posts/{post_id}/reject", response_type=PostPayload, data=params)
 
     def get_group_posts(
         self, group_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[Post]:
+    ) -> AsyncIterator[PostPayload]:
         return self._client.get_iter(
-            f"/v1/groups/{group_id}/posts", response_type=Post, batch_size=batch_size
+            f"/v1/groups/{group_id}/posts", response_type=PostPayload, batch_size=batch_size
         )
 
-    async def create_group_post(self, group_id: int, params: PostCreateParams) -> Post:
-        return await self._client.post(f"/v1/groups/{group_id}/posts", response_type=Post, data=params)
+    async def create_group_post(self, group_id: int, params: PostCreateParams) -> PostPayload:
+        return await self._client.post(f"/v1/groups/{group_id}/posts", response_type=PostPayload, data=params)
 
     async def delete_post(self, post_id: int) -> None:
         await self._client.delete(f"/v1/posts/{post_id}", response_type=DeleteResponse)
@@ -404,13 +435,13 @@ class HyvesClient:
 
     def get_comments(
         self, post_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[Comment]:
+    ) -> AsyncIterator[CommentPayload]:
         return self._client.get_iter(
-            f"/v1/posts/{post_id}/comments", response_type=Comment, batch_size=batch_size
+            f"/v1/posts/{post_id}/comments", response_type=CommentPayload, batch_size=batch_size
         )
 
-    async def create_comment(self, post_id: int, params: CommentCreateParams) -> Comment:
-        return await self._client.post(f"/v1/posts/{post_id}/comments", response_type=Comment, data=params)
+    async def create_comment(self, post_id: int, params: CommentCreateParams) -> CommentPayload:
+        return await self._client.post(f"/v1/posts/{post_id}/comments", response_type=CommentPayload, data=params)
 
     async def delete_comment(self, post_id: int, comment_id: int) -> None:
         await self._client.delete(f"/v1/posts/{post_id}/comments/{comment_id}", response_type=DeleteResponse)
@@ -419,19 +450,19 @@ class HyvesClient:
 
     # region Likes
 
-    async def like_post(self, post_id: int, params: LikePostParams) -> Post:
-        return await self._client.post(f"/v1/posts/{post_id}/like", response_type=Post, data=params)
+    async def like_post(self, post_id: int, params: LikePostParams) -> PostPayload:
+        return await self._client.post(f"/v1/posts/{post_id}/like", response_type=PostPayload, data=params)
 
     async def unlike_post(self, post_id: int, params: UnlikePostParams) -> None:
         # Apparently, unlike the other DELETE endpoints, this endpoint returns the new post
-        await self._client.delete(f"/v1/posts/{post_id}/like", params=params, response_type=Post)
+        await self._client.delete(f"/v1/posts/{post_id}/like", params=params, response_type=PostPayload)
 
-    async def like_comment(self, comment_id: int, params: LikeCommentParams) -> Comment:
+    async def like_comment(self, comment_id: int, params: LikeCommentParams) -> CommentPayload:
         # The endpoint is /posts, not /comments for some reason
-        return await self._client.post(f"/v1/posts/{comment_id}/like", response_type=Comment, data=params)
+        return await self._client.post(f"/v1/posts/{comment_id}/like", response_type=CommentPayload, data=params)
 
     async def unlike_comment(self, comment_id: int, params: UnlikeCommentParams) -> None:
-        await self._client.delete(f"/v1/posts/{comment_id}/like", params=params, response_type=Comment)
+        await self._client.delete(f"/v1/posts/{comment_id}/like", params=params, response_type=CommentPayload)
 
     # endregion
 
@@ -439,8 +470,8 @@ class HyvesClient:
 
     def get_client_friends(
         self, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[Friend]:
-        return self._client.get_iter("/v1/friends", response_type=Friend, batch_size=batch_size)
+    ) -> AsyncIterator[FriendPayload]:
+        return self._client.get_iter("/v1/friends", response_type=FriendPayload, batch_size=batch_size)
 
     async def delete_friend(self, account_id: int) -> None:
         await self._client.delete(f"/v1/friends/{account_id}", response_type=DeleteResponse)
@@ -450,21 +481,77 @@ class HyvesClient:
         params: FriendRequestsParams,
         *,
         batch_size: int = 4,
-    ) -> AsyncIterator[FriendRequest]:
+    ) -> AsyncIterator[FriendRequestPayload]:
         return self._client.get_iter(
-            "/v1/friends/requests", response_type=FriendRequest, params=params, batch_size=batch_size
+            "/v1/friends/requests", response_type=FriendRequestPayload, params=params, batch_size=batch_size
         )
 
-    async def create_friend_request(self, params: FriendRequestCreateParams) -> FriendRequest:
-        return await self._client.post("/v1/friends/requests", response_type=FriendRequest, data=params)
+    async def create_friend_request(self, params: FriendRequestCreateParams) -> FriendRequestPayload:
+        return await self._client.post("/v1/friends/requests", response_type=FriendRequestPayload, data=params)
 
     async def delete_friend_request(self, request_id: int) -> None:
         await self._client.delete(f"/v1/friends/requests/{request_id}", response_type=DeleteResponse)
 
-    async def accept_friend_request(self, request_id: int) -> FriendRequest:
-        return await self._client.post(f"/v1/friends/requests/{request_id}/accept", response_type=FriendRequest)
+    async def accept_friend_request(self, request_id: int) -> FriendRequestPayload:
+        return await self._client.post(f"/v1/friends/requests/{request_id}/accept", response_type=FriendRequestPayload)
 
-    async def deny_friend_request(self, request_id: int) -> FriendRequest:
-        return await self._client.post(f"/v1/friends/requests/{request_id}/deny", response_type=FriendRequest)
+    async def deny_friend_request(self, request_id: int) -> FriendRequestPayload:
+        return await self._client.post(f"/v1/friends/requests/{request_id}/deny", response_type=FriendRequestPayload)
+
+    # endregion
+
+    # region Builders
+
+    def build_account_ref(self, account_id: int) -> AccountRef:
+        return AccountRef(self, account_id)
+
+    def build_account_preview(self, payload: PartialAccountPayload | GroupMemberPayload) -> AccountPreview:
+        match payload:
+            case PartialAccountPayload():
+                return AccountPreview(self, payload)
+            case GroupMemberPayload():
+                return AccountPreview(
+                    self, PartialAccountPayload(
+                        profileId=payload.userId,
+                        name=payload.name,
+                        firstName=payload.firstName,
+                        middleName=payload.middleName,
+                        lastName=payload.lastName,
+                        imageUrl=payload.image,
+                        bannerUrl=payload.banner,
+                    )
+                )
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    def build_account(self, payload: AccountPayload) -> Account:
+        return Account(self, payload)
+
+    def build_group_ref(self, group_id: int) -> GroupRef:
+        return GroupRef(self, group_id)
+
+    def build_group_preview(self, payload: PartialGroupPayload) -> GroupPreview:
+        return GroupPreview(self, payload)
+
+    def build_group(self, payload: GroupPayload) -> Group:
+        return Group(self, payload)
+
+    def build_group_member(self, payload: GroupMemberPayload) -> GroupMember:
+        return GroupMember(self, payload)
+
+    def build_post_ref(self, post_id: int) -> PostRef:
+        return PostRef(self, post_id)
+
+    def build_group_post(self, payload: PostPayload) -> GroupPost:
+        return GroupPost(self, payload)
+
+    def build_timeline_post(self, payload: PostPayload) -> TimelinePost:
+        return TimelinePost(self, payload)
+
+    def build_wall_post(self, payload: PostPayload) -> WallPost:
+        return WallPost(self, payload)
+
+    def build_comment(self, payload: CommentPayload) -> Comment:
+        return Comment(self, payload)
 
     # endregion
