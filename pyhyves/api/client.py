@@ -2,8 +2,7 @@ import logging
 from collections.abc import AsyncIterator, Mapping
 from typing import Any, assert_never, overload
 
-from httpx import AsyncClient
-from pydantic import BaseModel, ConfigDict, RootModel, alias_generators
+from pydantic import BaseModel, RootModel
 
 from pyhyves.account import (
     Account,
@@ -74,10 +73,7 @@ from pyhyves.api.schema import (
 from pyhyves.api.schema import (
     WallPost as WallPostPayload,
 )
-from pyhyves.auth import (
-    Auth,
-    HyvesAuthException,
-)
+from pyhyves.auth import HyvesOAuth2Client
 from pyhyves.config import BATCHED_REQUEST_LIMIT, HYVES_API_URL
 from pyhyves.group import Group, GroupMember, GroupPreview, GroupRef
 from pyhyves.post import (
@@ -91,9 +87,6 @@ from pyhyves.post import (
 
 logger = logging.getLogger(__name__)
 
-class CamelCaseModel(BaseModel):
-    model_config = ConfigDict(alias_generator=alias_generators.to_camel)
-
 
 class HyvesError(BaseModel):
     code: int
@@ -101,15 +94,15 @@ class HyvesError(BaseModel):
     description: str
     type: str
 
-class HyvesResponse(CamelCaseModel):
-    has_result: bool
+class HyvesResponse(BaseModel):
+    hasResult: bool
     errors: list[HyvesError]
     result: Any
 
-class BatchedResult(CamelCaseModel):
+class BatchedResult(BaseModel):
     items: list[Any]
     cursor: str | None
-    has_next: bool
+    hasNext: bool
     # limit: int
     # total: int | None
 
@@ -117,13 +110,10 @@ class HyvesAPIException(RuntimeError):
     """Raised when the Hyves API returns errors."""
 
 class HTTPClient:
-    """``httpx.AsyncClient`` wrapper with auth and response validation."""
+    """``httpx2.AsyncClient`` wrapper with auth and response validation."""
 
-    def __init__(self, *, auth: Auth | None = None, client: AsyncClient | None = None, ) -> None:
-        self._client = client or AsyncClient()
-        self._auth = auth
-        self._token: str | None = None
-
+    def __init__(self, client: HyvesOAuth2Client) -> None:
+        self._client = client
 
     async def request[T: BaseModel](
         self,
@@ -136,9 +126,7 @@ class HTTPClient:
         data: BaseModel | None = None,
         auth_required: bool = True
     ) -> T:
-        """Wrapper around httpx.request with auth.
-
-        If authentication is needed, the token is refreshed if necessary.
+        """Wrapper around httpx2.request with validation.
 
         :param endpoint: Endpoint
         :param method: HTTP request method
@@ -152,15 +140,6 @@ class HTTPClient:
         """
 
         url = HYVES_API_URL + endpoint
-        headers: dict[str, str] = {}
-
-        if auth_required:
-            if not self._auth:
-                raise HyvesAuthException("This method requires authentication, but no credentials were provided")
-
-            if not self._token:
-                self._token = await self._auth.get_new_token()
-            headers["Authorization"] = f"Bearer {self._token}"
 
         data_dump = data.model_dump(exclude_unset=True) if data else None
         params_dump = params.model_dump(exclude_unset=True) if params else None
@@ -172,18 +151,18 @@ class HTTPClient:
         response = await self._client.request(
             method=method,
             url=url,
-            headers=headers,
+            withhold_token=not auth_required,
             params=params_dump,
             json=data_dump,
         )
 
         formatted = HyvesResponse.model_validate(response.json())
 
-        if not formatted.has_result:
+        if not formatted.hasResult:
             raise HyvesAPIException(f"Hyves API returned {len(formatted.errors)} error(s): {formatted.errors}")
 
         if formatted.errors:
-            logger.warning(f"Got a result, but also received errors: {formatted.errors}")
+            logger.warning(f"Got a result from the Hyves API, but also received errors: {formatted.errors}")
 
         result = response_type.model_validate(formatted.result)
         return result
@@ -242,7 +221,7 @@ class HTTPClient:
             for x in batch.items:
                 yield response_type.model_validate(x)
 
-            has_next = batch.has_next
+            has_next = batch.hasNext
             if batch.cursor:
                 params_override["cursor"] = batch.cursor
             else:
@@ -315,8 +294,8 @@ class HTTPClient:
 class HyvesClient:
     """API endpoint definitions and builder methods for Pyhyves types"""
 
-    def __init__(self, *, auth: Auth | None = None, client: AsyncClient | None = None) -> None:
-        self._client = HTTPClient(auth=auth, client=client)
+    def __init__(self, client: HyvesOAuth2Client) -> None:
+        self._client = HTTPClient(client)
 
     # region Public endpoints
 

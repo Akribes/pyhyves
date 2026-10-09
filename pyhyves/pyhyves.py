@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Self, assert_never
-
-import httpx
+from typing import TYPE_CHECKING, Self
 
 from pyhyves.api.client import HyvesClient
 from pyhyves.api.schema import (
@@ -15,55 +12,26 @@ from pyhyves.api.schema import (
     WallPostApproveParams,
     WallPostRejectParams,
 )
-from pyhyves.auth import (
-    Auth,
-    Credentials,
-    PasswordAuth,
-    PasswordCredentials,
-    TokenAuth,
-    TokenCredentials,
-)
+from pyhyves.auth import Credentials, HyvesOAuth2Client
 
 if TYPE_CHECKING:
     from pyhyves.account import Account, AccountId, AccountRef
     from pyhyves.group import Group, GroupId, GroupRef
     from pyhyves.post import BasePost, PostId, PostRef
 
-logger = logging.getLogger(__name__)
-
 
 class Pyhyves:
     """An authenticated session against the Hyves API.
 
     :param credentials: How to authenticate. ``None`` only works for the public endpoints.
-    :param http: An existing HTTP client to use instead of creating one. When passed, the caller stays responsible
-        for closing it.
     """
 
     def __init__(
         self,
         credentials: Credentials | None = None,
-        *,
-        http: httpx.AsyncClient | None = None,
     ) -> None:
-        self._owns_http = http is None
-        self._http = httpx.AsyncClient() if http is None else http
-        self._client = self._build_client(credentials=credentials, http=self._http)
-
-    @staticmethod
-    def _build_client(credentials: Credentials | None, http: httpx.AsyncClient) -> HyvesClient:
-        auth: Auth | None
-        match credentials:
-            case None:
-                logger.warning("No credentials provided, most endpoints won't work")
-                auth = None
-            case PasswordCredentials():
-                auth = PasswordAuth(http, credentials)
-            case TokenCredentials():
-                auth = TokenAuth(credentials)
-            case _ as unreachable:
-                assert_never(unreachable)
-        return HyvesClient(auth=auth, client=http)
+        self._http = HyvesOAuth2Client(credentials)
+        self._client = HyvesClient(self._http)
 
     async def __aenter__(self) -> Self:
         return self
@@ -72,9 +40,8 @@ class Pyhyves:
         await self.aclose()
 
     async def aclose(self) -> None:
-        """Close the underlying HTTP client, unless it was injected."""
-        if self._owns_http:
-            await self._http.aclose()
+        """Close the underlying HTTP client."""
+        await self._http.aclose()
 
     # region Public
 

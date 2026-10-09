@@ -6,10 +6,11 @@ from .account import Account, AccountId, AccountPreview, AccountRef
 from .auth import (
     Credentials,
     HyvesAuthException,
+    HyvesOAuth2Client,
     PasswordCredentials,
     TokenCredentials,
 )
-from .group import GroupId
+from .group import Group, GroupId, GroupPreview, GroupRef
 from .post import (
     BasePost,
     Comment,
@@ -31,10 +32,14 @@ __all__ = (
     "Comment",
     "CommentId",
     "Credentials",
+    "Group",
     "GroupId",
     "GroupPost",
+    "GroupPreview",
+    "GroupRef",
     "HyvesAPIException",
     "HyvesAuthException",
+    "HyvesOAuth2Client",
     "PasswordCredentials",
     "Post",
     "PostId",

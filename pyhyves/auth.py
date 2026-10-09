@@ -1,24 +1,43 @@
-import base64
-import hashlib
-import logging
-import secrets
-import urllib.parse
-from typing import Literal, Protocol
+from __future__ import annotations
 
-from httpx import AsyncClient, Response
+import logging
+from asyncio import Lock
+from typing import Any, assert_never
+from urllib.parse import parse_qsl, urlsplit
+
+from authlib.common.errors import AuthlibBaseError
+from authlib.common.security import generate_token
+from authlib.integrations.httpx_client import AsyncOAuth2Client
+from authlib.integrations.httpx_client.oauth2_client import USE_CLIENT_DEFAULT
 from pydantic import BaseModel
 
-from pyhyves.config import HYVES_AUTHORIZATION_URL, HYVES_CLIENT_ID, HYVES_TOKEN_URL
+from pyhyves.config import (
+    HYVES_AUTHORIZATION_URL,
+    HYVES_CLIENT_ID,
+    HYVES_REDIRECT_URL,
+    HYVES_SCOPE,
+    HYVES_TOKEN_URL,
+)
 
 logger = logging.getLogger(__name__)
 
+# Length of the PKCE code verifier. The RFC allows 43 to 128 characters.
+CODE_VERIFIER_LENGTH = 96
+
+
 class TokenCredentials(BaseModel):
-    """Credentials from an existing access token, e.g. from DevTools."""
+    """Credentials from an existing access token, e.g. from DevTools.
+
+    This token is never refreshed, so it expires at the end of its lifetime. Use
+    :class:`PasswordCredentials` for a session that keeps itself alive.
+    """
+
     access_token: str
 
 
 class PasswordCredentials(BaseModel):
     """Credentials for logging in with a username and password."""
+
     login_id: str
     password: str
 
@@ -30,125 +49,131 @@ class HyvesAuthException(RuntimeError):
     pass
 
 
-class Auth(Protocol):
-    async def get_new_token(self) -> str:
-        """Acquire and return a fresh token."""
-        ...
+class HyvesOAuth2Client(AsyncOAuth2Client):  # type: ignore[misc]
+    """An OAuth 2.0 client for the Hyves API.
 
+    This is an ``httpx2.AsyncClient`` subclass, so it doubles as the transport for
+    :class:`pyhyves.api.client.HTTPClient`. Authlib takes care of attaching the
+    ``Authorization`` header and of refreshing the access token before it expires.
 
-class TokenAuth:
-    """Returns a constant token once (for example, intercepted from DevTools)"""
+    :param credentials: How to authenticate. ``None`` only allows public endpoints.
+    :param client_kwargs: Extra keyword arguments for the underlying ``httpx2.AsyncClient``.
+    """
 
-    def __init__(self, credentials: TokenCredentials) -> None:
-        self._token = credentials.access_token
-        self._expired = False
+    def __init__(self, credentials: Credentials | None = None, **client_kwargs: Any) -> None:
+        match credentials:
+            case None:
+                login_id = password = None
+            case PasswordCredentials():
+                login_id = credentials.login_id
+                password = credentials.password
+            case TokenCredentials():
+                login_id = password = None
+            case _ as unreachable:
+                assert_never(unreachable)
 
-    async def get_new_token(self) -> str:
-        if self._expired:
-            raise HyvesAuthException("TokenAuth does not support refreshing tokens")
-        self._expired = True
+        self._login_id = login_id
+        self._password = password
+        # Serialises logins, so that concurrent requests only trigger a single one
+        self._login_lock = Lock()
 
-        return self._token
-
-
-class RequestTokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    expires_in: int
-    userId: str
-    token_type: Literal["Bearer"]
-
-
-class PasswordAuth:
-    """Logs in with a username and password.
-
-    This mimics the login flow from the web app, which uses OAuth 2.0 with PKCE. Normally, a client is sent to
-    https://auth.hyves.nl/authorize, which runs FusionAuth and returns a login form. It contains some hidden fields
-    that are normally forwarded in a POST request to the same endpoint, but it seems we don't need to send those along,
-    and we don't need to read anything from the login page.
-
-    So to log in, we (1) start with a POST request to https://auth.hyves.nl/oauth2/authorize with a username, password
-    and our own OAuth code challenge, (2) follow its redirects, and (3) finally intercept the authorization code from
-    query parameters of the final redirect. We then (4) use that to retrieve an access and refresh token from
-    https://auth.hyves.nl/oauth2/token."""
-
-    def __init__(self, http: AsyncClient, credentials: PasswordCredentials) -> None:
-        self._http = http
-        self._login_id = credentials.login_id
-        self._password = credentials.password
-
-    async def get_new_token(self) -> str:
-        token = await self._do_password_auth()
-        logger.info("Successfully logged in")
-        return token
-
-    async def _do_password_auth(self) -> str:
-        code_verifier, code_challenge = self._generate_code_challenge()
-
-        authorize_response = await self._request_authorization_code(code_challenge)
-        query_params = authorize_response.request.url.query.decode()
-        parsed_params = urllib.parse.parse_qs(query_params)
-        code = parsed_params["code"][0]
-
-        token_response = await self._request_token(code_verifier, code)
-        formatted_response = RequestTokenResponse.model_validate(token_response.json())
-
-        return formatted_response.access_token
-
-    async def _request_authorization_code(self, code_challenge: str) -> Response:
-        logger.debug("Requesting authorization code with username and password")
-
-        # The commented lines are sent by the Hyves web app, but seemingly not required
-        return await self._http.post(
-            HYVES_AUTHORIZATION_URL,
-            data={
-                "client_id": HYVES_CLIENT_ID,
-                "code_challenge": code_challenge,
-                "code_challenge_method": "S256",
-                "redirect_uri": "https://hyves.nl/auth",
-                "response_mode": "query",
-                "response_type": "code",
-                "scope": "openid offline_access",
-                "loginId": self._login_id,
-                "password": self._password,
-                # "captcha_token": "",
-                # "drop_jkt": "",
-                # "metaData.device.name": "",
-                # "metaData.device.type": "",
-                # "nonce": "",
-                # "oauth_context": "",
-                # "max_age": "",
-                # "pendingIdPLinkId": "",
-                # "prompt": "",
-                # "state": "",
-                # "tenantId": "",
-                # "timezone": "",
-                # "user_code": "",
-                # "showPasswordField": "true",
-                # "userVerifyingPlatformAuthenticatorAvailable": "false",
-                # "rememberDevice": "true",
-            },
-            follow_redirects=True,
-        )
-
-    async def _request_token(self, code_verifier: str, code: str) -> Response:
-        logger.debug("Requesting token from authorization code")
-        return await self._http.post(
-            HYVES_TOKEN_URL,
-            data={
-                "code": code,
-                "grant_type": "authorization_code",
-                "redirect_uri": "https://hyves.nl/auth",
-                "client_id": HYVES_CLIENT_ID,
-                "code_verifier": code_verifier,
-            },
+        super().__init__(
+            client_id=HYVES_CLIENT_ID,
+            code_challenge_method="S256",
+            redirect_uri=HYVES_REDIRECT_URL,
+            scope=HYVES_SCOPE,
+            authorization_endpoint=HYVES_AUTHORIZATION_URL,
+            token_endpoint=HYVES_TOKEN_URL,
+            token_endpoint_auth_method="none",
+            token=self._initial_token(credentials),
+            **self._default_client_kwargs(client_kwargs),
         )
 
     @staticmethod
-    def _generate_code_challenge() -> tuple[str, str]:
-        """Generate a code verifier and code challenge for OAuth 2.0 PKCE."""
-        code_verifier = secrets.token_urlsafe(96)[:128]
-        hashed_verifier = hashlib.sha256(code_verifier.encode("ascii")).digest()
-        encoded_verifier = base64.urlsafe_b64encode(hashed_verifier)
-        code_challenge = encoded_verifier.decode("ascii").rstrip("=")
-        return code_verifier, code_challenge
+    def _default_client_kwargs(client_kwargs: dict[str, Any]) -> dict[str, Any]:
+        return {"http2": True} | client_kwargs
+
+    @staticmethod
+    def _initial_token(credentials: Credentials | None) -> dict[str, Any] | None:
+        """Seed the client with a token that never expires.
+
+        A token without ``expires_at`` is treated as valid forever by authlib, which is
+        what we want for a token that cannot be refreshed.
+        """
+        if isinstance(credentials, TokenCredentials):
+            return {"access_token": credentials.access_token, "token_type": "Bearer"}
+        return None
+
+    @property
+    def can_authenticate(self) -> bool:
+        """Whether this client is able to authenticate at all."""
+        return self._login_id is not None or self.token is not None
+
+    async def request(
+        self,
+        method: str,
+        url: Any,
+        withhold_token: bool = False,
+        auth: Any = USE_CLIENT_DEFAULT,
+        **kwargs: Any,
+    ) -> Any:
+        """Send a request, logging in first if that has not happened yet."""
+        # Authlib's own token requests pass an explicit auth, so they do not re-enter here
+        if not withhold_token and auth is USE_CLIENT_DEFAULT and not self.token:
+            if not self.can_authenticate:
+                raise HyvesAuthException(
+                    "This method requires authentication, but no credentials were provided"
+                )
+            await self._ensure_logged_in()
+
+        try:
+            return await super().request(method, url, withhold_token=withhold_token, auth=auth, **kwargs)
+        except AuthlibBaseError as error:
+            raise HyvesAuthException(f"Authentication failed: {error}") from error
+
+    async def _ensure_logged_in(self) -> None:
+        """Log in, unless another request got there first."""
+        async with self._login_lock:
+            if self.token:
+                return
+            await self._login()
+
+    async def _login(self) -> None:
+        """Log in with the configured username and password.
+
+        This mimics the login flow from the web app, which uses OAuth 2.0 with PKCE. Normally, a client is sent to
+        the authorization endpoint, which runs FusionAuth and returns a login form. Since we cannot receive the
+        redirect, we (1) let authlib build the authorization URL with our credentials and code challenge, (2) POST
+        it ourselves and follow its redirects, and (3) let authlib exchange the authorization code from the final
+        redirect for an access and refresh token.
+        """
+        logger.debug("Requesting access token with username and password")
+
+        try:
+            code_verifier = generate_token(CODE_VERIFIER_LENGTH)
+            authorization_url, state = self.create_authorization_url(
+                HYVES_AUTHORIZATION_URL,
+                code_verifier=code_verifier,
+                response_mode="query",
+                loginId=self._login_id,
+                password=self._password,
+            )
+
+            response = await super().request(
+                "POST",
+                HYVES_AUTHORIZATION_URL,
+                data=dict(parse_qsl(urlsplit(authorization_url).query)),
+                follow_redirects=True,
+                withhold_token=True,
+            )
+
+            await self.fetch_token(
+                url=HYVES_TOKEN_URL,
+                authorization_response=str(response.url),
+                state=state,
+                code_verifier=code_verifier,
+            )
+        except AuthlibBaseError as error:
+            raise HyvesAuthException(f"Login failed: {error}") from error
+
+        logger.info("Successfully logged in")
