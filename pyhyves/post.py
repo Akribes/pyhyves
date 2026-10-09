@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, NewType, assert_never
+from typing import TYPE_CHECKING, NewType
 
+from pyhyves.api.schema import (
+    BasePost as PostPayload,
+)
 from pyhyves.api.schema import (
     Comment as CommentPayload,
 )
@@ -14,7 +17,15 @@ from pyhyves.api.schema import (
     UnlikeCommentParams,
     UnlikePostParams,
 )
-from pyhyves.api.schema import Post as PostPayload
+from pyhyves.api.schema import (
+    GroupPost as GroupPostPayload,
+)
+from pyhyves.api.schema import (
+    TimelinePost as TimelinePostPayload,
+)
+from pyhyves.api.schema import (
+    WallPost as WallPostPayload,
+)
 
 if TYPE_CHECKING:
     from pyhyves.api.client import HyvesClient
@@ -31,7 +42,7 @@ class PostRef:
 
     async def fetch(self) -> GroupPost | WallPost | TimelinePost:
         payload = await self._client.get_post(self.id)
-        return post_from_payload(self._client, payload)
+        return self._client.build_post(payload)
 
     async def like(self) -> None:
         """Like this post and return it with the updated counters."""
@@ -57,7 +68,7 @@ class PostRef:
         """Delete this post."""
         await self._client.delete_post(self.id)
 
-class Post(PostRef):
+class BasePost(PostRef):
     """Common fields of all post types (timeline, wall, group)."""
 
     def __init__(self, client: HyvesClient, payload: PostPayload) -> None:
@@ -79,33 +90,22 @@ class Post(PostRef):
         self.location_coordinate = payload.locationCoordinate
         self.recent_liker_names = payload.recentLikerNames
 
-class GroupPost(Post):
-    def __init__(self, client: HyvesClient, payload: PostPayload) -> None:
-        assert payload.postType == PostType.GROUP
+class GroupPost(BasePost):
+    def __init__(self, client: HyvesClient, payload: GroupPostPayload) -> None:
         super().__init__(client, payload)
         self.group = client.build_group_ref(payload.groupId)
 
-class WallPost(Post):
-    def __init__(self, client: HyvesClient, payload: PostPayload) -> None:
-        assert payload.postType == PostType.WALL
+class WallPost(BasePost):
+    def __init__(self, client: HyvesClient, payload: WallPostPayload) -> None:
         super().__init__(client, payload)
         self.wall_owner = client.build_account_ref(payload.wallOwnerId)
 
-class TimelinePost(Post):
-    def __init__(self, client: HyvesClient, payload: PostPayload) -> None:
+class TimelinePost(BasePost):
+    def __init__(self, client: HyvesClient, payload: TimelinePostPayload) -> None:
         assert payload.postType == PostType.TIMELINE
         super().__init__(client, payload)
 
-def post_from_payload(client: HyvesClient, payload: PostPayload) -> GroupPost | WallPost | TimelinePost:
-    match payload.postType:
-        case PostType.GROUP:
-            return GroupPost(client, payload)
-        case PostType.WALL:
-            return WallPost(client, payload)
-        case PostType.TIMELINE:
-            return TimelinePost(client, payload)
-        case _ as unreachable:
-            assert_never(unreachable)
+Post = GroupPost | WallPost | TimelinePost
 
 class Comment:
     def __init__(self, client: HyvesClient, payload: CommentPayload):

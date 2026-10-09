@@ -10,7 +10,16 @@ from .auth import (
     TokenCredentials,
 )
 from .group import GroupId
-from .post import Comment, CommentId, GroupPost, Post, PostId, TimelinePost, WallPost
+from .post import (
+    BasePost,
+    Comment,
+    CommentId,
+    GroupPost,
+    Post,
+    PostId,
+    TimelinePost,
+    WallPost,
+)
 from .pyhyves import Pyhyves
 
 __all__ = (
@@ -18,6 +27,7 @@ __all__ = (
     "AccountId",
     "AccountPreview",
     "AccountRef",
+    "BasePost",
     "Comment",
     "CommentId",
     "Credentials",

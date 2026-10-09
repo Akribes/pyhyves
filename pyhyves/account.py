@@ -32,7 +32,7 @@ class AccountRef:
 
     async def get_wall_posts(self) -> AsyncIterator[WallPost]:
         async for payload in self._client.get_wall_posts(self.id):
-            yield self._client.build_wall_post(payload)
+            yield self._client.build_post(payload)
 
     async def create_wall_post(self, content: str, link: str | None = None) -> None:
         params = PostCreateParams(content=content, link=link)

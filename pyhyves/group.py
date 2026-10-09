@@ -63,7 +63,7 @@ class GroupRef:
 
     async def get_posts(self) -> AsyncIterator[GroupPost]:
         async for payload in self._client.get_group_posts(self.id):
-            yield self._client.build_group_post(payload)
+            yield self._client.build_post(payload)
 
     async def create_post(self, content: str, link: str | None = None) -> None:
         params = PostCreateParams(content=content, link=link)

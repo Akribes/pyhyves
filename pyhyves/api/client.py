@@ -1,9 +1,9 @@
 import logging
 from collections.abc import AsyncIterator, Mapping
-from typing import Any, assert_never
+from typing import Any, assert_never, overload
 
 from httpx import AsyncClient
-from pydantic import BaseModel, ConfigDict, alias_generators
+from pydantic import BaseModel, ConfigDict, RootModel, alias_generators
 
 from pyhyves.account import (
     Account,
@@ -51,6 +51,9 @@ from pyhyves.api.schema import (
     GroupMember as GroupMemberPayload,
 )
 from pyhyves.api.schema import (
+    GroupPost as GroupPostPayload,
+)
+from pyhyves.api.schema import (
     GroupUserOptions as GroupUserOptionsPayload,
 )
 from pyhyves.api.schema import (
@@ -65,6 +68,12 @@ from pyhyves.api.schema import (
 from pyhyves.api.schema import (
     TimelineEntry as TimelineEntryPayload,
 )
+from pyhyves.api.schema import (
+    TimelinePost as TimelinePostPayload,
+)
+from pyhyves.api.schema import (
+    WallPost as WallPostPayload,
+)
 from pyhyves.auth import (
     Auth,
     HyvesAuthException,
@@ -74,6 +83,7 @@ from pyhyves.group import Group, GroupMember, GroupPreview, GroupRef
 from pyhyves.post import (
     Comment,
     GroupPost,
+    Post,
     PostRef,
     TimelinePost,
     WallPost,
@@ -395,36 +405,38 @@ class HyvesClient:
     # region Posts
 
     async def get_post(self, post_id: int) -> PostPayload:
-        return await self._client.get(f"/v1/posts/{post_id}", response_type=PostPayload)
+        response_type = RootModel[PostPayload]
+        payload = await self._client.get(f"/v1/posts/{post_id}", response_type=response_type)
+        return payload.root
 
-    async def create_timeline_post(self, params: PostCreateParams) -> PostPayload:
-        return await self._client.post("/v1/posts", response_type=PostPayload, data=params)
+    async def create_timeline_post(self, params: PostCreateParams) -> TimelinePostPayload:
+        return await self._client.post("/v1/posts", response_type=TimelinePostPayload, data=params)
 
     def get_wall_posts(
         self, account_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[PostPayload]:
+    ) -> AsyncIterator[WallPostPayload]:
         return self._client.get_iter(
-            f"/v1/wall/{account_id}/posts", response_type=PostPayload, batch_size=batch_size
+            f"/v1/wall/{account_id}/posts", response_type=WallPostPayload, batch_size=batch_size
         )
 
-    async def create_wall_post(self, account_id: int, params: PostCreateParams) -> PostPayload:
-        return await self._client.post(f"/v1/wall/{account_id}/posts", response_type=PostPayload, data=params)
+    async def create_wall_post(self, account_id: int, params: PostCreateParams) -> WallPostPayload:
+        return await self._client.post(f"/v1/wall/{account_id}/posts", response_type=WallPostPayload, data=params)
 
-    async def approve_wall_post(self, post_id: int, params: WallPostApproveParams) -> PostPayload:
-        return await self._client.post(f"/v1/wall/posts/{post_id}/approve", response_type=PostPayload, data=params)
+    async def approve_wall_post(self, post_id: int, params: WallPostApproveParams) -> WallPostPayload:
+        return await self._client.post(f"/v1/wall/posts/{post_id}/approve", response_type=WallPostPayload, data=params)
 
-    async def reject_wall_post(self, post_id: int, params: WallPostRejectParams) -> PostPayload:
-        return await self._client.post(f"/v1/wall/posts/{post_id}/reject", response_type=PostPayload, data=params)
+    async def reject_wall_post(self, post_id: int, params: WallPostRejectParams) -> WallPostPayload:
+        return await self._client.post(f"/v1/wall/posts/{post_id}/reject", response_type=WallPostPayload, data=params)
 
     def get_group_posts(
         self, group_id: int, *, batch_size: int = BATCHED_REQUEST_LIMIT
-    ) -> AsyncIterator[PostPayload]:
+    ) -> AsyncIterator[GroupPostPayload]:
         return self._client.get_iter(
-            f"/v1/groups/{group_id}/posts", response_type=PostPayload, batch_size=batch_size
+            f"/v1/groups/{group_id}/posts", response_type=GroupPostPayload, batch_size=batch_size
         )
 
-    async def create_group_post(self, group_id: int, params: PostCreateParams) -> PostPayload:
-        return await self._client.post(f"/v1/groups/{group_id}/posts", response_type=PostPayload, data=params)
+    async def create_group_post(self, group_id: int, params: PostCreateParams) -> GroupPostPayload:
+        return await self._client.post(f"/v1/groups/{group_id}/posts", response_type=GroupPostPayload, data=params)
 
     async def delete_post(self, post_id: int) -> None:
         await self._client.delete(f"/v1/posts/{post_id}", response_type=DeleteResponse)
@@ -451,18 +463,22 @@ class HyvesClient:
     # region Likes
 
     async def like_post(self, post_id: int, params: LikePostParams) -> PostPayload:
-        return await self._client.post(f"/v1/posts/{post_id}/like", response_type=PostPayload, data=params)
+        response_type = RootModel[PostPayload]
+        payload = await self._client.post(f"/v1/posts/{post_id}/like", response_type=response_type, data=params)
+        return payload.root
 
-    async def unlike_post(self, post_id: int, params: UnlikePostParams) -> None:
+    async def unlike_post(self, post_id: int, params: UnlikePostParams) -> PostPayload:
         # Apparently, unlike the other DELETE endpoints, this endpoint returns the new post
-        await self._client.delete(f"/v1/posts/{post_id}/like", params=params, response_type=PostPayload)
+        response_type = RootModel[PostPayload]
+        payload = await self._client.delete(f"/v1/posts/{post_id}/like", params=params, response_type=response_type)
+        return payload.root
 
     async def like_comment(self, comment_id: int, params: LikeCommentParams) -> CommentPayload:
         # The endpoint is /posts, not /comments for some reason
         return await self._client.post(f"/v1/posts/{comment_id}/like", response_type=CommentPayload, data=params)
 
-    async def unlike_comment(self, comment_id: int, params: UnlikeCommentParams) -> None:
-        await self._client.delete(f"/v1/posts/{comment_id}/like", params=params, response_type=CommentPayload)
+    async def unlike_comment(self, comment_id: int, params: UnlikeCommentParams) -> CommentPayload:
+        return await self._client.delete(f"/v1/posts/{comment_id}/like", params=params, response_type=CommentPayload)
 
     # endregion
 
@@ -542,14 +558,28 @@ class HyvesClient:
     def build_post_ref(self, post_id: int) -> PostRef:
         return PostRef(self, post_id)
 
-    def build_group_post(self, payload: PostPayload) -> GroupPost:
-        return GroupPost(self, payload)
+    @overload
+    def build_post(self, payload: GroupPostPayload) -> GroupPost: ...
 
-    def build_timeline_post(self, payload: PostPayload) -> TimelinePost:
-        return TimelinePost(self, payload)
+    @overload
+    def build_post(self, payload: TimelinePostPayload) -> TimelinePost: ...
 
-    def build_wall_post(self, payload: PostPayload) -> WallPost:
-        return WallPost(self, payload)
+    @overload
+    def build_post(self, payload: WallPostPayload) -> WallPost: ...
+
+    @overload
+    def build_post(self, payload: PostPayload) -> Post: ...
+
+    def build_post(self, payload: PostPayload) -> Post:
+        match payload:
+            case GroupPostPayload():
+                return GroupPost(self, payload)
+            case TimelinePostPayload():
+                return TimelinePost(self, payload)
+            case WallPostPayload():
+                return WallPost(self, payload)
+            case _ as unreachable:
+                assert_never(unreachable)
 
     def build_comment(self, payload: CommentPayload) -> Comment:
         return Comment(self, payload)

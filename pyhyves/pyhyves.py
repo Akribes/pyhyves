@@ -27,7 +27,7 @@ from pyhyves.auth import (
 if TYPE_CHECKING:
     from pyhyves.account import Account, AccountId, AccountRef
     from pyhyves.group import Group, GroupId, GroupRef
-    from pyhyves.post import Post, PostId, PostRef
+    from pyhyves.post import BasePost, PostId, PostRef
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class Pyhyves:
         """Return a reference to a post, without fetching it."""
         return self._client.build_post_ref(post_id)
 
-    async def get_post(self, post_id: PostId) -> Post:
+    async def get_post(self, post_id: PostId) -> BasePost:
         """Get a post by id."""
         return await self.get_post_ref(post_id).fetch()
 

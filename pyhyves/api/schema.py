@@ -153,18 +153,13 @@ class WallVisibility(StrEnum):
     APPROVED = auto()
     PENDING = auto()
 
-class Post(BaseModel):
+class BasePost(BaseModel):
     id: int
     authorUserId: int
     postType: PostType
     content: str
     link: str | None = None
     linkPreview: Any | None = None
-    wallOwnerId: int | None = None
-    groupId: int | None = None
-    groupName: str | None = None
-    groupImageUrl: str | None = None
-    wallVisibility: WallVisibility | str | None = None
     likesEnabled: bool
     commentsEnabled: bool
     locationName: str | None = None
@@ -184,6 +179,22 @@ class Post(BaseModel):
     groupModerationHiddenAt: Any | None = None
     likedByMe: bool
     author: PartialAccount
+
+class GroupPost(BasePost):
+    postType: Literal[PostType.GROUP]
+    groupId: int
+    groupName: str
+    groupImageUrl: str | None = None
+
+class WallPost(BasePost):
+    postType: Literal[PostType.WALL]
+    wallOwnerId: int
+    wallVisibility: WallVisibility | str
+
+class TimelinePost(BasePost):
+    postType: Literal[PostType.TIMELINE]
+
+Post = GroupPost | WallPost | TimelinePost
 
 class Comment(BaseModel):
     id: int
