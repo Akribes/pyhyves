@@ -18,28 +18,42 @@ if TYPE_CHECKING:
     from pyhyves.post import WallPost
 
 AccountId = NewType("AccountId", int)
+"""Een `NewType` van `int` voor account-ID's."""
 
 class AccountRef:
-    """A reference to a profile. Upgrade to a full ``Account`` with ``fetch``."""
+    """Een referentie naar een profiel. Haal het volledige `Account` op met `fetch`."""
 
     def __init__(self, client: HyvesClient, account_id: int) -> None:
         self._client = client
         self.id = AccountId(account_id)
 
     async def fetch(self) -> Account:
+        """Haalt het volledige profiel op."""
         payload = await self._client.get_account(self.id)
         return self._client.build_account(payload)
 
     async def get_wall_posts(self) -> AsyncIterator[WallPost]:
+        """Itereert over de Krabbels op dit profiel.
+
+        Yields:
+            Krabbels, geladen in batches zodra ze nodig zijn.
+        """
+
         async for payload in self._client.get_wall_posts(self.id):
             yield self._client.build_post(payload)
 
-    async def create_wall_post(self, content: str, link: str | None = None) -> None:
+    async def create_wall_post(self, content: str, link: str | None = None) -> WallPost:
+        """Plaatst een Krabbel op dit profiel.
+
+        Returns:
+            De nieuwe post.
+        """
         params = PostCreateParams(content=content, link=link)
-        await self._client.create_wall_post(self.id, params)
+        payload = await self._client.create_wall_post(self.id, params)
+        return self._client.build_post(payload)
 
 class AccountPreview(AccountRef):
-    """A partial account. Upgrade to a full ``Account`` with ``fetch``."""
+    """Een gedeeltelijk profiel. Haal het volledige `Account` op met `fetch`."""
 
     def __init__(self, client: HyvesClient, payload: PartialAccountPayload):
         self._client = client
@@ -52,7 +66,9 @@ class AccountPreview(AccountRef):
         self.banner_url = payload.bannerUrl
 
 class Account(AccountPreview):
-    """Another user's public profile."""
+    """Het profiel van een gebruiker.
+
+    Te verkrijgen met [pyhyves.Pyhyves.get_account][]."""
 
     def __init__(self, client: HyvesClient, payload: AccountPayload):
         self._client = client

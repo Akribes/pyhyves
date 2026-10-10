@@ -1,6 +1,4 @@
-"""
-Pydantic models representing API inputs and responses
-"""
+"""Pydantic-modellen voor de input en output van de Hyves-API."""
 
 from enum import StrEnum, auto
 from typing import Any, Literal
@@ -145,13 +143,16 @@ class TimelineEntry(BaseModel):
     updatedAt: Any
 
 class PostType(StrEnum):
-    GROUP = auto()
-    WALL = auto()
-    TIMELINE = auto()
+    GROUP = "group"
+    """In een Hyve"""
+    WALL = "wall"
+    """Krabbel"""
+    TIMELINE = "timeline"
+    """WieWatWaar"""
 
 class WallVisibility(StrEnum):
-    APPROVED = auto()
-    PENDING = auto()
+    APPROVED = "approved"
+    PENDING = "pending"
 
 class BasePost(BaseModel):
     id: int
@@ -213,11 +214,18 @@ class Comment(BaseModel):
     hasReplies: bool
 
 class GroupVisibility(StrEnum):
-    PUBLIC = auto()
+    """Zichtbaarheid van een Hyve. Momenteel ondersteunt Hyves alleen nog openbare Hyves."""
+
+    PUBLIC = "public"
 
 class GroupRole(StrEnum):
-    OWNER = auto()
-    MEMBER = auto()
+    """Rol van een lid in een groep."""
+
+    OWNER = "owner"
+    """Groepseigenaar."""
+
+    MEMBER = "member"
+    """Lid."""
 
 class Location(BaseModel):
     id: int

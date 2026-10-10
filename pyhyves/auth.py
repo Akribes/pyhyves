@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from asyncio import Lock
+from dataclasses import dataclass
 from typing import Any, assert_never
 from urllib.parse import parse_qsl, urlsplit
 
@@ -9,7 +10,6 @@ from authlib.common.errors import AuthlibBaseError
 from authlib.common.security import generate_token
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from authlib.integrations.httpx_client.oauth2_client import USE_CLIENT_DEFAULT
-from pydantic import BaseModel
 
 from pyhyves.config import (
     HYVES_AUTHORIZATION_URL,
@@ -25,24 +25,21 @@ logger = logging.getLogger(__name__)
 CODE_VERIFIER_LENGTH = 96
 
 
-class TokenCredentials(BaseModel):
-    """Credentials from an existing access token, e.g. from DevTools.
+@dataclass(frozen=True)
+class TokenCredentials:
+    """Inloggegevens op basis van een bestaand access token, bijvoorbeeld uit DevTools.
 
-    This token is never refreshed, so it expires at the end of its lifetime. Use
-    :class:`PasswordCredentials` for a session that keeps itself alive.
+    Het token wordt niet ververst en vervalt na een uur.
     """
 
     access_token: str
 
-
-class PasswordCredentials(BaseModel):
-    """Credentials for logging in with a username and password."""
+@dataclass(frozen=True)
+class PasswordCredentials:
+    """Een gebruikersnaam en wachtwoord."""
 
     login_id: str
     password: str
-
-
-Credentials = TokenCredentials | PasswordCredentials
 
 
 class HyvesAuthException(RuntimeError):
@@ -50,17 +47,17 @@ class HyvesAuthException(RuntimeError):
 
 
 class HyvesOAuth2Client(AsyncOAuth2Client):  # type: ignore[misc]
-    """An OAuth 2.0 client for the Hyves API.
+    """Een OAuth 2.0-client voor de Hyves API.
 
-    This is an ``httpx2.AsyncClient`` subclass, so it doubles as the transport for
-    :class:`pyhyves.api.client.HTTPClient`. Authlib takes care of attaching the
-    ``Authorization`` header and of refreshing the access token before it expires.
+    Dit is een subclass van `httpx2.AsyncClient` en wordt door `pyhyves.api.client.HTTPClient` gebruikt. Authlib voegt
+    de `Authorization`-header toe aan requests en ververst automatisch tokens.
 
-    :param credentials: How to authenticate. ``None`` only allows public endpoints.
-    :param client_kwargs: Extra keyword arguments for the underlying ``httpx2.AsyncClient``.
+    Args:
+        credentials: Inloggegevens
+        client_kwargs: Extra kwargs voor de onderliggende `httpx2.AsyncClient`
     """
 
-    def __init__(self, credentials: Credentials | None = None, **client_kwargs: Any) -> None:
+    def __init__(self, credentials: PasswordCredentials | TokenCredentials | None = None, **client_kwargs: Any) -> None:
         match credentials:
             case None:
                 login_id = password = None
@@ -94,11 +91,11 @@ class HyvesOAuth2Client(AsyncOAuth2Client):  # type: ignore[misc]
         return {"http2": True} | client_kwargs
 
     @staticmethod
-    def _initial_token(credentials: Credentials | None) -> dict[str, Any] | None:
-        """Seed the client with a token that never expires.
+    def _initial_token(credentials: PasswordCredentials | TokenCredentials | None) -> dict[str, Any] | None:
+        """Voorziet de client van een token dat nooit verloopt.
 
-        A token without ``expires_at`` is treated as valid forever by authlib, which is
-        what we want for a token that cannot be refreshed.
+        Authlib behandelt een token zonder `expires_at` als altijd geldig, en als we een `TokenCredentials` hebben
+        wilen we dat.
         """
         if isinstance(credentials, TokenCredentials):
             return {"access_token": credentials.access_token, "token_type": "Bearer"}
@@ -106,7 +103,7 @@ class HyvesOAuth2Client(AsyncOAuth2Client):  # type: ignore[misc]
 
     @property
     def can_authenticate(self) -> bool:
-        """Whether this client is able to authenticate at all."""
+        """Of deze client op enige manier kan authenticeren."""
         return self._login_id is not None or self.token is not None
 
     async def request(
@@ -117,7 +114,11 @@ class HyvesOAuth2Client(AsyncOAuth2Client):  # type: ignore[misc]
         auth: Any = USE_CLIENT_DEFAULT,
         **kwargs: Any,
     ) -> Any:
-        """Send a request, logging in first if that has not happened yet."""
+        """Stuurt een request, logt eerst in als dat nog niet is gebeurd.
+
+        Raises:
+            HyvesAuthException: Als er geen inloggegevens zijn meegegeven, of als het inloggen mislukt.
+        """
         # Authlib's own token requests pass an explicit auth, so they do not re-enter here
         if not withhold_token and auth is USE_CLIENT_DEFAULT and not self.token:
             if not self.can_authenticate:
@@ -132,20 +133,18 @@ class HyvesOAuth2Client(AsyncOAuth2Client):  # type: ignore[misc]
             raise HyvesAuthException(f"Authentication failed: {error}") from error
 
     async def _ensure_logged_in(self) -> None:
-        """Log in, unless another request got there first."""
+        """Logt in, tenzij een andere request daar eerder was."""
         async with self._login_lock:
             if self.token:
                 return
             await self._login()
 
     async def _login(self) -> None:
-        """Log in with the configured username and password.
+        """Logt in met een gebruikersnaam en wachtwoord.
 
-        This mimics the login flow from the web app, which uses OAuth 2.0 with PKCE. Normally, a client is sent to
-        the authorization endpoint, which runs FusionAuth and returns a login form. Since we cannot receive the
-        redirect, we (1) let authlib build the authorization URL with our credentials and code challenge, (2) POST
-        it ourselves and follow its redirects, and (3) let authlib exchange the authorization code from the final
-        redirect for an access and refresh token.
+        Doet zich voor als de webapp. Werkt met OAuth 2.0 met PKCE. Normaal gesproken logt de gebruiker in door naar de
+        URL gegenereerd door Authlib te gaan, maar omdat we de redirect_uri niet kunnen veranderen maken we hier gewoon
+        zelf de request die de browser normaal zou maken. Vervolgens vraagt authlib weer een access token aan.
         """
         logger.debug("Requesting access token with username and password")
 

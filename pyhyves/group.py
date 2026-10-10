@@ -39,37 +39,58 @@ class GroupMember:
 
 
 GroupId = NewType("GroupId", int)
+"""Een `NewType` van `int` voor Hyve-ID's."""
 
 class GroupRef:
-    """A reference to a group. Upgrade to a full ``Group`` with ``fetch``."""
+    """Een referentie naar een Hyve. Haal de volledige `Group` op met `fetch`."""
 
     def __init__(self, client: HyvesClient, group_id: int) -> None:
         self._client = client
         self.id = GroupId(group_id)
 
     async def fetch(self) -> Group:
+        """Haalt een `Group` op van de Hyves-API."""
         payload = await self._client.get_group(self.id)
         return self._client.build_group(payload)
 
     async def join(self) -> None:
+        """Word lid van deze Hyve."""
         await self._client.join_group(self.id, params=GroupJoinParams())
 
     async def leave(self) -> None:
+        """Verlaat deze Hyve."""
         await self._client.leave_group(self.id)
 
     async def get_members(self) -> AsyncIterator[GroupMember]:
+        """Itereert over de leden van deze Hyve.
+
+        Yields:
+            Hyve-leden.
+        """
         async for payload in self._client.get_group_members(self.id):
             yield self._client.build_group_member(payload)
 
     async def get_posts(self) -> AsyncIterator[GroupPost]:
+        """Itereert over de posts in deze Hyve.
+
+        Yields:
+            Posts, van nieuw naar oud.
+        """
         async for payload in self._client.get_group_posts(self.id):
             yield self._client.build_post(payload)
 
     async def create_post(self, content: str, link: str | None = None) -> None:
+        """Plaatst een post in deze Hyve.
+
+        Args:
+            content: Inhoud van de post
+            link: Optionele link
+        """
         params = PostCreateParams(content=content, link=link)
         await self._client.create_group_post(self.id, params=params)
 
     async def get_user_options(self) -> GroupUserOptions:
+        """Gebruikersvoorkeuren voor deze Hyve"""
         payload = await self._client.get_group_user_options(self.id)
         return GroupUserOptions(
             payload.timeline,
@@ -78,6 +99,10 @@ class GroupRef:
         )
 
     async def update_user_options(self, options: GroupUserOptions) -> None:
+        """Wijzigt de gebruikersvoorkeuren voor deze Hyve.
+
+        Args:
+            options: Voorkeuren"""
         params = GroupUserOptionsUpdateParams(
             timeline=options.timeline,
             friendsActivity=options.friends_activity,
@@ -88,11 +113,12 @@ class GroupRef:
     # async def update(self, ...): ...
 
     async def delete(self) -> None:
+        """Verwijdert deze Hyve."""
         await self._client.delete_group(self.id)
 
 
 class GroupPreview(GroupRef):
-    """A preview of a group. Upgrade to a full ``Group`` with ``fetch``."""
+    """Een verkorte weergave van een Hyve. Haal de volledige `Group` op met `fetch`."""
 
     def __init__(self, client: HyvesClient, payload: PartialGroupPayload) -> None:
         self._client = client
@@ -103,7 +129,7 @@ class GroupPreview(GroupRef):
 
 
 class Group(GroupPreview):
-    """A group's public profile."""
+    """Gegevens over een Hyve."""
 
     def __init__(self, client: HyvesClient, payload: GroupPayload) -> None:
         self._client = client

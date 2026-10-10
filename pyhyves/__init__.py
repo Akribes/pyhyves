@@ -1,11 +1,10 @@
-"""A Python client for the Hyves API."""
+"""Python-client voor de Hyves-API."""
 
 from pyhyves.api.client import HyvesAPIException
 
 from .account import Account, AccountId, AccountPreview, AccountRef
-from .api.schema import GroupRole, GroupVisibility
+from .api.schema import GroupRole, GroupVisibility, PostType
 from .auth import (
-    Credentials,
     HyvesAuthException,
     PasswordCredentials,
     TokenCredentials,
@@ -32,7 +31,6 @@ __all__ = (
     "BasePost",
     "Comment",
     "CommentId",
-    "Credentials",
     "Group",
     "GroupId",
     "GroupPost",
@@ -46,6 +44,7 @@ __all__ = (
     "Post",
     "PostId",
     "PostRef",
+    "PostType",
     "Pyhyves",
     "TimelinePost",
     "TokenCredentials",

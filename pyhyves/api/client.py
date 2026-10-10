@@ -107,10 +107,10 @@ class BatchedResult(BaseModel):
     # total: int | None
 
 class HyvesAPIException(RuntimeError):
-    """Raised when the Hyves API returns errors."""
+    """Een fout vanuit de Hyves-API."""
 
 class HTTPClient:
-    """``httpx2.AsyncClient`` wrapper with auth and response validation."""
+    """Wrapper om `httpx2.AsyncClient` met authenticatie en validatie."""
 
     def __init__(self, client: HyvesOAuth2Client) -> None:
         self._client = client
@@ -126,17 +126,23 @@ class HTTPClient:
         data: BaseModel | None = None,
         auth_required: bool = True
     ) -> T:
-        """Wrapper around httpx2.request with validation.
+        """Stuurt een request en valideert de respons.
 
-        :param endpoint: Endpoint
-        :param method: HTTP request method
-        :param response_type: Pydantic model to validate the response against
-        :param params: Request parameters
-        :param params_override: Parameters to override
-        :param params_override: Query parameters overwritten in the Pydantic model
-        :param data: Request JSON body
-        :param auth_required: Whether to include Authorization header
-        :return: Validated response
+        Args:
+            endpoint: Het endpoint om aan te roepen.
+            method: De HTTP-requestmethode.
+            response_type: Het Pydantic-model om de respons mee te valideren.
+            params: Query-parameters van de request.
+            params_override: Query-parameters die de waarden uit `params`
+                overschrijven.
+            data: De body van de request als Pydantic-model.
+            auth_required: Of de `Authorization`-header nodig is.
+
+        Returns:
+            De gevalideerde respons.
+
+        Raises:
+            HyvesAPIException: Als de Hyves-API een fout teruggeeft.
         """
 
         url = HYVES_API_URL + endpoint
@@ -192,17 +198,25 @@ class HTTPClient:
         batch_size: int = BATCHED_REQUEST_LIMIT,
         auth_required: bool = True
     ) -> AsyncIterator[T]:
-        """Lazily load items from an endpoint.
+        """Laadt items van een endpoint zodra ze nodig zijn, in batches.
 
-        Some endpoints (comments, groups, etc.) return a list of items in pages. This method returns an iterator that
-        requests batches of items as needed.
+        Sommige endpoints (reacties, groepen, etc.) geven hun items terug
+        in pagina's. Deze methode geeft een iterator terug die steeds een nieuwe
+        batch aanvraagt op het moment dat die nodig is.
 
-        :param endpoint: The endpoint to load items from
-        :param response_type: The type to validate against
-        :param params: Query parameters to send with the request. ``limit`` and ``cursor`` are overwritten.
-        :param auth_required: Whether to include the Authorization header
-        :param batch_size: Number of items to request per batch
-        :return: Validated items
+        Args:
+            endpoint: Het endpoint om de items van op te halen.
+            response_type: Het type om de items mee te valideren.
+            params: Query-parameters om mee te sturen. `limit` en `cursor` worden
+                overschreven.
+            batch_size: Het aantal items per batch.
+            auth_required: Of de `Authorization`-header nodig is.
+
+        Yields:
+            De gevalideerde items.
+
+        Raises:
+            HyvesAPIException: Als de Hyves-API een fout teruggeeft.
         """
 
         params_override = {"limit": str(batch_size)}
@@ -292,7 +306,7 @@ class HTTPClient:
         )
 
 class HyvesClient:
-    """API endpoint definitions and builder methods for Pyhyves types"""
+    """Definities van de API-endpoints en builders voor de Pyhyves-types."""
 
     def __init__(self, client: HyvesOAuth2Client) -> None:
         self._client = HTTPClient(client)

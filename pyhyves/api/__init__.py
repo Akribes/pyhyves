@@ -1,3 +1,1 @@
-"""
-Classes for calling the Hyves API and mappings to Pyhyves types
-"""
+"""Classes om de Hyves API aan te roepen en mappings naar Pyhyves-types."""
