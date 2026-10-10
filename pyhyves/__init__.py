@@ -39,7 +39,6 @@ __all__ = (
     "GroupRef",
     "HyvesAPIException",
     "HyvesAuthException",
-    "HyvesOAuth2Client",
     "PasswordCredentials",
     "Post",
     "PostId",

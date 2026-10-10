@@ -1,7 +1,7 @@
 [project]
 name = "pyhyves"
 version = "0.1.0"
-description = "Python client for Hyves"
+description = "Python-client for Hyves"
 authors = [
     {name = "Akribes"}
 ]
@@ -42,4 +42,7 @@ dev = [
     # against the httpx v1 classes, which the tests therefore import directly
     "httpx (>=0.28.1,<0.29.0)",
     "pytest-httpx2 (>=1.0.0,<2.0.0)",
+    "mkdocstrings-python (>=2.0.9,<3.0.0)",
+    "mkdocs-material (>=9.7.7,<10.0.0)",
+    "mkdocs[i18n] (>=1.6.1,<2.0.0)",
 ]
