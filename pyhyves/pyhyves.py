@@ -13,7 +13,7 @@ from pyhyves.api.schema import (
 from pyhyves.auth import HyvesOAuth2Client, PasswordCredentials, TokenCredentials
 
 if TYPE_CHECKING:
-    from pyhyves.account import Account, AccountId, AccountRef
+    from pyhyves.account import Account, AccountId, AccountRef, ClientAccount
     from pyhyves.group import Group, GroupId, GroupRef
     from pyhyves.post import BasePost, PostId, PostRef
 
@@ -58,6 +58,15 @@ class Pyhyves:
     # endregion
 
     # region Account
+
+    async def get_client_account(self) -> ClientAccount:
+        """Haalt het profiel van de ingelogde gebruiker op.
+
+        Returns:
+            Het profiel van de ingelogde gebruiker.
+        """
+        payload = await self._client.get_client_account()
+        return self._client.build_client_account(payload)
 
     def get_account_ref(self, account_id: AccountId) -> AccountRef:
         """Maakt een referentie naar een account zonder een request te maken."""

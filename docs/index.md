@@ -14,6 +14,9 @@ async def main():
     credentials = PasswordCredentials(login_id="...", password="...")
     
     async with Pyhyves(credentials) as hyves:
+        me = await hyves.get_client_account()
+        print(f"Ingelogd als {me.name}") 
+
         # Post een WieWatWaar
         await hyves.create_timeline_post(":dancing_banana:")
         
@@ -58,5 +61,8 @@ De meeste objecten in deze library hebben drie varianten. Bijvoorbeeld voor een 
 - `AccountRef`: alleen een referentie naar een profiel, ook in sommige endpoints teruggegeven
 
 Gebruik `.fetch()` om het hele object te krijgen of te verversen.
+
+Daarnaast is er `ClientAccount`: je eigen profiel, met ook de gegevens die alleen voor jou
+zichtbaar zijn, zoals je e-mailadres. Die krijg je met `hyves.get_client_account()`.
 
 Alle errors vanuit de API worden een `HyvesAPIException`.

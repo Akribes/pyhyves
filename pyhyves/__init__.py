@@ -2,7 +2,7 @@
 
 from pyhyves.api.client import HyvesAPIException
 
-from .account import Account, AccountId, AccountPreview, AccountRef
+from .account import Account, AccountId, AccountPreview, AccountRef, ClientAccount
 from .api.schema import GroupRole, GroupVisibility, PostType
 from .auth import (
     HyvesAuthException,
@@ -29,6 +29,7 @@ __all__ = (
     "AccountPreview",
     "AccountRef",
     "BasePost",
+    "ClientAccount",
     "Comment",
     "CommentId",
     "Group",

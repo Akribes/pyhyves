@@ -20,6 +20,9 @@ async def main():
     credentials = PasswordCredentials(login_id="...", password="...")
     
     async with Pyhyves(credentials) as hyves:
+        me = await hyves.get_client_account()
+        print(f"Ingelogd als {me.name}") 
+        
         # Post een WieWatWaar
         await hyves.create_timeline_post(":dancing_banana:")
         

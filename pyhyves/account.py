@@ -7,6 +7,9 @@ from pyhyves.api.schema import (
     Account as AccountPayload,
 )
 from pyhyves.api.schema import (
+    ClientAccount as ClientAccountPayload,
+)
+from pyhyves.api.schema import (
     PartialAccount as PartialAccountPayload,
 )
 from pyhyves.api.schema import (
@@ -88,3 +91,39 @@ class Account(AccountPreview):
         self.background_color = payload.backgroundColor
         self.job_title = payload.jobTitle
         self.is_blocked = payload.isBlocked
+
+
+class ClientAccount(Account):
+    """Het profiel van de ingelogde gebruiker.
+
+    Te verkrijgen met [pyhyves.Pyhyves.get_client_account][]."""
+
+    def __init__(self, client: HyvesClient, payload: ClientAccountPayload) -> None:
+        self._client = client
+        self.id = AccountId(payload.id)
+        self.name = payload.name
+        self.first_name = payload.firstName
+        self.middle_name = payload.middleName
+        self.last_name = payload.lastName
+        self.image_url = payload.image
+        self.banner_url = payload.banner
+        self.background_html = payload.backgroundHtml
+        self.bio = payload.bio
+        self.city = payload.city
+        self.country = payload.country
+        self.primary_color = payload.primaryColor
+        self.secondary_color = payload.secondaryColor
+        self.background_color = payload.backgroundColor
+        self.job_title = payload.jobTitle
+        self.gender = payload.gender
+        self.slug = payload.slug
+        self.email = payload.email
+        self.email_verified = payload.emailVerified
+        self.language = payload.language
+        self.date_of_birth = payload.dateOfBirth
+        self.interests = payload.interests
+        self.banned = payload.banned
+        self.ban_reason = payload.banReason
+        self.banned_at = payload.bannedAt
+        self.banned_until = payload.bannedUntil
+        self.unread_notification_count = payload.unreadNotificationCount

@@ -8,6 +8,7 @@ from pyhyves.account import (
     Account,
     AccountPreview,
     AccountRef,
+    ClientAccount,
 )
 from pyhyves.api.schema import (
     Account as AccountPayload,
@@ -535,6 +536,9 @@ class HyvesClient:
 
     def build_account(self, payload: AccountPayload) -> Account:
         return Account(self, payload)
+
+    def build_client_account(self, payload: ClientAccountPayload) -> ClientAccount:
+        return ClientAccount(self, payload)
 
     def build_group_ref(self, group_id: int) -> GroupRef:
         return GroupRef(self, group_id)
