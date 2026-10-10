@@ -3,10 +3,10 @@
 from pyhyves.api.client import HyvesAPIException
 
 from .account import Account, AccountId, AccountPreview, AccountRef
+from .api.schema import GroupRole, GroupVisibility
 from .auth import (
     Credentials,
     HyvesAuthException,
-    HyvesOAuth2Client,
     PasswordCredentials,
     TokenCredentials,
 )
@@ -18,6 +18,7 @@ from .post import (
     GroupPost,
     Post,
     PostId,
+    PostRef,
     TimelinePost,
     WallPost,
 )
@@ -37,11 +38,14 @@ __all__ = (
     "GroupPost",
     "GroupPreview",
     "GroupRef",
+    "GroupRole",
+    "GroupVisibility",
     "HyvesAPIException",
     "HyvesAuthException",
     "PasswordCredentials",
     "Post",
     "PostId",
+    "PostRef",
     "Pyhyves",
     "TimelinePost",
     "TokenCredentials",

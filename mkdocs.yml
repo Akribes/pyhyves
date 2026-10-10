@@ -15,6 +15,8 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.superfences
+  - toc:
+      toc_depth: 3
 
 plugins:
 - mkdocstrings:
@@ -26,12 +28,15 @@ plugins:
             options:
                 docstring_options:
                     ignore_init_summary: true
-                docstring_section_style: list
+                docstring_section_style: table
                 signature_crossrefs: true
                 unwrap_annotated: true
                 filters: public
                 inherited_members: true
-                summary: false
+                summary:
+                    module: false
+                    class: true
+                    attributes: true
                 heading_level: 2
                 parameter_headings: true
                 type_parameter_headings: true
@@ -40,7 +45,7 @@ plugins:
                 show_symbol_type_heading: true
                 show_symbol_type_toc: true
                 line_length: 88
-                merge_init_into_class: true
+                merge_init_into_class: false
                 separate_signature: false
                 show_attribute_values: false
                 show_overloads: true
