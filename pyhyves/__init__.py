@@ -9,7 +9,14 @@ from .auth import (
     PasswordCredentials,
     TokenCredentials,
 )
-from .group import Group, GroupId, GroupPreview, GroupRef
+from .group import (
+    Group,
+    GroupId,
+    GroupMember,
+    GroupPreview,
+    GroupRef,
+    GroupUserOptions,
+)
 from .post import (
     BasePost,
     Comment,
@@ -34,10 +41,12 @@ __all__ = (
     "CommentId",
     "Group",
     "GroupId",
+    "GroupMember",
     "GroupPost",
     "GroupPreview",
     "GroupRef",
     "GroupRole",
+    "GroupUserOptions",
     "GroupVisibility",
     "HyvesAPIException",
     "HyvesAuthException",

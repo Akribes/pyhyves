@@ -31,13 +31,17 @@ plugins:
                 docstring_section_style: table
                 signature_crossrefs: true
                 unwrap_annotated: true
-                filters: public
+                # Most constructors aren't meant to be used directly, so we leave them out of the docs.
+                # The few classes that do need __init__ to be shown are overridden in api.md.
+                filters:
+                  - '!^_'
+                  - '__\w+__$'
+                  - '!^__init__$'
                 inherited_members: true
                 summary:
                     module: false
                     class: true
                     attributes: true
-                heading_level: 2
                 parameter_headings: true
                 type_parameter_headings: true
                 show_root_heading: true
@@ -57,3 +61,5 @@ plugins:
                 show_submodules: false
                 show_source: false
                 show_if_no_docstring: true
+                # docs/api.md has its own `##` sections, so symbols sit one level below
+                heading_level: 3
