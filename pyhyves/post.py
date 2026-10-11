@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, NewType
+from typing import TYPE_CHECKING, Any, NewType
 
 from pyhyves.api.schema import (
     BasePost as PostPayload,
@@ -28,7 +28,9 @@ from pyhyves.api.schema import (
 )
 
 if TYPE_CHECKING:
+    from pyhyves.account import AccountPreview, AccountRef
     from pyhyves.api.client import HyvesClient
+    from pyhyves.group import GroupRef
 
 PostId = NewType("PostId", int)
 """Een `NewType` van `int` voor post-ID's."""
@@ -38,6 +40,8 @@ CommentId = NewType("CommentId", int)
 
 class PostRef:
     """Een referentie naar een post. Haal de volledige `Post` op met `fetch`."""
+
+    id: PostId
 
     def __init__(self, client: HyvesClient, post_id: int) -> None:
         self._client = client
@@ -83,6 +87,23 @@ class PostRef:
 class BasePost(PostRef):
     """Gedeelde attributes van alle soorten posts (tijdlijn, muur, groep)"""
 
+    id: PostId
+    author: AccountPreview
+    post_type: PostType
+    content: str
+    link: str | None
+    tags: list[str]
+    has_media: bool
+    has_tags: bool
+    like_count: int
+    comment_count: int
+    liked_by_me: bool
+    likes_enabled: bool
+    comments_enabled: bool
+    location_name: str | None
+    location_coordinate: Any | None
+    recent_liker_names: list[str]
+
     def __init__(self, client: HyvesClient, payload: PostPayload) -> None:
         self._client = client
         self.id = PostId(payload.id)
@@ -105,6 +126,9 @@ class BasePost(PostRef):
 class GroupPost(BasePost):
     """Een post in een Hyve."""
 
+    id: PostId
+    group: GroupRef
+
     def __init__(self, client: HyvesClient, payload: GroupPostPayload) -> None:
         super().__init__(client, payload)
         self.group = client.build_group_ref(payload.groupId)
@@ -112,12 +136,17 @@ class GroupPost(BasePost):
 class WallPost(BasePost):
     """Een Krabbel op iemands profiel."""
 
+    id: PostId
+    wall_owner: AccountRef
+
     def __init__(self, client: HyvesClient, payload: WallPostPayload) -> None:
         super().__init__(client, payload)
         self.wall_owner = client.build_account_ref(payload.wallOwnerId)
 
 class TimelinePost(BasePost):
     """Een WieWatWaar."""
+
+    id: PostId
 
     def __init__(self, client: HyvesClient, payload: TimelinePostPayload) -> None:
         assert payload.postType == PostType.TIMELINE
@@ -128,6 +157,16 @@ Post = GroupPost | WallPost | TimelinePost
 
 class Comment:
     """Een reactie op een post. De Hyves-API stuurt altijd de hele reactie mee, dus er is geen `CommentRef`."""
+
+    id: CommentId
+    post: PostRef
+    author: AccountPreview
+    content: str
+    tags: list[str]
+    liked_by_me: bool
+    like_count: int
+    has_replies: bool
+    recent_liker_names: list[str]
 
     def __init__(self, client: HyvesClient, payload: CommentPayload):
         self._client = client

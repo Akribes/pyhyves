@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, NewType
+from typing import TYPE_CHECKING, Any, NewType
 
 from pyhyves.api.schema import (
     Account as AccountPayload,
@@ -25,6 +25,8 @@ AccountId = NewType("AccountId", int)
 
 class AccountRef:
     """Een referentie naar een profiel. Haal het volledige `Account` op met `fetch`."""
+
+    id: AccountId
 
     def __init__(self, client: HyvesClient, account_id: int) -> None:
         self._client = client
@@ -58,6 +60,14 @@ class AccountRef:
 class AccountPreview(AccountRef):
     """Een gedeeltelijk profiel. Haal het volledige `Account` op met `fetch`."""
 
+    id: AccountId
+    name: str
+    first_name: str | None
+    middle_name: str | None
+    last_name: str | None
+    image_url: str | None
+    banner_url: str | None
+
     def __init__(self, client: HyvesClient, payload: PartialAccountPayload):
         self._client = client
         self.id = AccountId(payload.profileId)
@@ -72,6 +82,23 @@ class Account(AccountPreview):
     """Het profiel van een gebruiker.
 
     Te verkrijgen met [pyhyves.Pyhyves.get_account][]."""
+
+    id: AccountId
+    name: str
+    first_name: str | None
+    middle_name: str | None
+    last_name: str | None
+    image_url: str | None
+    banner_url: str | None
+    slug: str
+    background_html: str | None
+    bio: str | None
+    city: str | None
+    primary_color: str | None
+    secondary_color: str | None
+    background_color: str | None
+    job_title: str | None
+    is_blocked: bool | None
 
     def __init__(self, client: HyvesClient, payload: AccountPayload):
         self._client = client
@@ -97,6 +124,34 @@ class ClientAccount(Account):
     """Het profiel van de ingelogde gebruiker.
 
     Te verkrijgen met [pyhyves.Pyhyves.get_client_account][]."""
+
+    id: AccountId
+    name: str
+    first_name: str | None
+    middle_name: str | None
+    last_name: str | None
+    image_url: str | None
+    banner_url: str | None
+    slug: str
+    background_html: str | None
+    bio: str | None
+    city: str | None
+    primary_color: str | None
+    secondary_color: str | None
+    background_color: str | None
+    job_title: str | None
+    country: str | None
+    gender: str | None
+    email: str
+    email_verified: bool
+    language: str | None
+    date_of_birth: str
+    interests: list[str]
+    banned: bool
+    ban_reason: Any | None
+    banned_at: Any | None
+    banned_until: Any | None
+    unread_notification_count: int
 
     def __init__(self, client: HyvesClient, payload: ClientAccountPayload) -> None:
         self._client = client

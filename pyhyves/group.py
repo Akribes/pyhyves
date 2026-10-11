@@ -9,6 +9,7 @@ from pyhyves.api.schema import (
 )
 from pyhyves.api.schema import (
     GroupJoinParams,
+    GroupRole,
     GroupUserOptionsUpdateParams,
     PostCreateParams,
 )
@@ -20,6 +21,7 @@ from pyhyves.api.schema import (
 )
 
 if TYPE_CHECKING:
+    from pyhyves.account import AccountPreview, AccountRef
     from pyhyves.api.client import HyvesClient
     from pyhyves.post import GroupPost
 
@@ -30,6 +32,11 @@ class GroupUserOptions:
     notifications: bool
 
 class GroupMember:
+    group: GroupRef
+    account: AccountPreview
+    role: GroupRole
+    is_blocked_from_group: bool
+
     def __init__(self, client: HyvesClient, payload: GroupMemberPayload):
         self._client = client
         self.group = client.build_group_ref(payload.groupId)
@@ -43,6 +50,8 @@ GroupId = NewType("GroupId", int)
 
 class GroupRef:
     """Een referentie naar een Hyve. Haal de volledige `Group` op met `fetch`."""
+
+    id: GroupId
 
     def __init__(self, client: HyvesClient, group_id: int) -> None:
         self._client = client
@@ -120,6 +129,11 @@ class GroupRef:
 class GroupPreview(GroupRef):
     """Een verkorte weergave van een Hyve. Haal de volledige `Group` op met `fetch`."""
 
+    id: GroupId
+    name: str
+    image_url: str | None
+    banner_url: str | None
+
     def __init__(self, client: HyvesClient, payload: PartialGroupPayload) -> None:
         self._client = client
         self.id = GroupId(payload.id)
@@ -130,6 +144,21 @@ class GroupPreview(GroupRef):
 
 class Group(GroupPreview):
     """Gegevens over een Hyve."""
+
+    id: GroupId
+    name: str
+    image_url: str | None
+    banner_url: str | None
+    description: str
+    owner: AccountRef
+    role_to_post: GroupRole
+    likes_on_post_enabled: bool
+    comments_on_post_enabled: bool
+    member_count: int
+    is_owner: bool
+    background_html: str | None
+    member_role: GroupRole | None
+    can_post: bool | None
 
     def __init__(self, client: HyvesClient, payload: GroupPayload) -> None:
         self._client = client
