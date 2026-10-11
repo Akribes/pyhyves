@@ -33,7 +33,12 @@ class AccountRef:
         self.id = AccountId(account_id)
 
     async def fetch(self) -> Account:
-        """Haalt het volledige profiel op."""
+        """Haalt het volledige profiel op.
+
+        Returns:
+            Een `Account`, ook voor je eigen account. Gebruik [pyhyves.Pyhyves.get_client_account][] voor je eigen
+                account.
+        """
         payload = await self._client.get_account(self.id)
         return self._client.build_account(payload)
 
@@ -78,10 +83,8 @@ class AccountPreview(AccountRef):
         self.image_url = payload.imageUrl
         self.banner_url = payload.bannerUrl
 
-class Account(AccountPreview):
-    """Het profiel van een gebruiker.
-
-    Te verkrijgen met [pyhyves.Pyhyves.get_account][]."""
+class BaseAccount(AccountPreview):
+    """Gedeelde attributes van een volledig profiel."""
 
     id: AccountId
     name: str
@@ -98,9 +101,8 @@ class Account(AccountPreview):
     secondary_color: str | None
     background_color: str | None
     job_title: str | None
-    is_blocked: bool | None
 
-    def __init__(self, client: HyvesClient, payload: AccountPayload):
+    def __init__(self, client: HyvesClient, payload: AccountPayload | ClientAccountPayload):
         self._client = client
         self.id = AccountId(payload.id)
         self.name = payload.name
@@ -117,29 +119,27 @@ class Account(AccountPreview):
         self.secondary_color = payload.secondaryColor
         self.background_color = payload.backgroundColor
         self.job_title = payload.jobTitle
+
+
+class Account(BaseAccount):
+    """Het profiel van een gebruiker.
+
+    Te verkrijgen met [pyhyves.Pyhyves.get_account][]."""
+
+    id: AccountId
+    is_blocked: bool | None
+
+    def __init__(self, client: HyvesClient, payload: AccountPayload):
+        super().__init__(client, payload)
         self.is_blocked = payload.isBlocked
 
 
-class ClientAccount(Account):
+class ClientAccount(BaseAccount):
     """Het profiel van de ingelogde gebruiker.
 
     Te verkrijgen met [pyhyves.Pyhyves.get_client_account][]."""
 
     id: AccountId
-    name: str
-    first_name: str | None
-    middle_name: str | None
-    last_name: str | None
-    image_url: str | None
-    banner_url: str | None
-    slug: str
-    background_html: str | None
-    bio: str | None
-    city: str | None
-    primary_color: str | None
-    secondary_color: str | None
-    background_color: str | None
-    job_title: str | None
     country: str | None
     gender: str | None
     email: str
@@ -154,24 +154,9 @@ class ClientAccount(Account):
     unread_notification_count: int
 
     def __init__(self, client: HyvesClient, payload: ClientAccountPayload) -> None:
-        self._client = client
-        self.id = AccountId(payload.id)
-        self.name = payload.name
-        self.first_name = payload.firstName
-        self.middle_name = payload.middleName
-        self.last_name = payload.lastName
-        self.image_url = payload.image
-        self.banner_url = payload.banner
-        self.background_html = payload.backgroundHtml
-        self.bio = payload.bio
-        self.city = payload.city
+        super().__init__(client, payload)
         self.country = payload.country
-        self.primary_color = payload.primaryColor
-        self.secondary_color = payload.secondaryColor
-        self.background_color = payload.backgroundColor
-        self.job_title = payload.jobTitle
         self.gender = payload.gender
-        self.slug = payload.slug
         self.email = payload.email
         self.email_verified = payload.emailVerified
         self.language = payload.language

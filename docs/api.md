@@ -38,6 +38,8 @@
 
 ::: pyhyves.AccountPreview
 
+::: pyhyves.BaseAccount
+
 ::: pyhyves.Account
 
 ::: pyhyves.ClientAccount

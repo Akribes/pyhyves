@@ -38,10 +38,7 @@ plugins:
                   - '__\w+__$'
                   - '!^__init__$'
                 inherited_members: true
-                summary:
-                    module: false
-                    class: true
-                    attributes: true
+                summary: false
                 parameter_headings: true
                 type_parameter_headings: true
                 show_root_heading: true
