@@ -26,6 +26,10 @@
 
 ::: pyhyves.CommentId
 
+::: pyhyves.KEEP_CURRENT
+    options:
+      filters: ['!^_', '__\w+__$']
+
 ## Exceptions
 
 ::: pyhyves.HyvesAPIException

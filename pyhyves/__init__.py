@@ -36,8 +36,10 @@ from .post import (
     WallPost,
 )
 from .pyhyves import Pyhyves
+from .util import KEEP_CURRENT
 
 __all__ = (
+    "KEEP_CURRENT",
     "Account",
     "AccountId",
     "AccountPreview",

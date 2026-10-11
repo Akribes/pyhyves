@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, NewType
+from typing import TYPE_CHECKING, Any, NewType
 
 from pyhyves.api.schema import (
     Group as GroupPayload,
 )
 from pyhyves.api.schema import (
     GroupJoinParams,
+    GroupPatchParams,
     GroupRole,
     GroupUserOptionsUpdateParams,
     PostCreateParams,
@@ -19,6 +20,7 @@ from pyhyves.api.schema import (
 from pyhyves.api.schema import (
     PartialGroup as PartialGroupPayload,
 )
+from pyhyves.util import KEEP_CURRENT
 
 if TYPE_CHECKING:
     from pyhyves.account import AccountPreview, AccountRef
@@ -27,14 +29,29 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class GroupUserOptions:
+    """Gebruikersvoorkeuren voor een Hyve, uit het menu "Voorkeuren" van een Hyve."""
+
     timeline: bool
+    """Toon activiteiten in activiteitentijdlijn"""
+
     friends_activity: bool
+    """Toon activiteiten van vrienden"""
+
     notifications: bool
+    """Notificaties"""
 
 class GroupMember:
+    """Een lidmaatschap van een Hyve."""
+
     group: GroupRef
+    """De Hyve waarin deze lid is."""
+
     account: AccountPreview
+    """Het lid zelf."""
+
     role: GroupRole
+    """De rol van het lid."""
+
     is_blocked_from_group: bool
 
     def __init__(self, client: HyvesClient, payload: GroupMemberPayload):
@@ -119,7 +136,43 @@ class GroupRef:
         )
         await self._client.update_group_user_options(self.id, params=params)
 
-    # async def update(self, ...): ...
+    async def edit(
+        self,
+        *,
+        name: str = KEEP_CURRENT,
+        description: str = KEEP_CURRENT,
+        role_to_post: GroupRole = KEEP_CURRENT,
+        likes_on_post_enabled: bool = KEEP_CURRENT,
+        comments_on_post_enabled: bool = KEEP_CURRENT,
+    ) -> Group:
+        """Wijzigt de naam en/of groepsomschrijving van deze Hyve.
+
+        Alleen de parameters die je meegeeft worden naar de Hyves-API gestuurd.
+        Geef je `None` mee, dan wordt dat veld geleegd.
+
+        Args:
+            name: Een nieuwe naam.
+            description: Een nieuwe groepsomschrijving.
+            role_to_post: Minimale rol om in deze groep te posten.
+            likes_on_post_enabled: Respect toestaan.
+            comments_on_post_enabled: Reacties toestaan. Hyves geeft een error als je dit gebruikt in combinatie met
+                `role_to_post` op [pyhyves.GroupRole.MEMBER][MEMBER].
+
+        Returns:
+            De gewijzigde Hyve.
+        """
+        given = {
+            "id": self.id,
+            "name": name,
+            "description": description,
+            "roleToPost": role_to_post,
+            "likesOnPostEnabled": likes_on_post_enabled,
+            "commentsOnPostEnabled": comments_on_post_enabled,
+        }
+        data: dict[str, Any] = {key: value for key, value in given.items() if value is not KEEP_CURRENT}
+        params = GroupPatchParams(**data)
+        payload = await self._client.update_group(self.id, params)
+        return self._client.build_group(payload)
 
     async def delete(self) -> None:
         """Verwijdert deze Hyve."""

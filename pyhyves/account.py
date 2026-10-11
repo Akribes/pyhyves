@@ -151,7 +151,6 @@ class ClientAccount(BaseAccount):
     ban_reason: Any | None
     banned_at: Any | None
     banned_until: Any | None
-    unread_notification_count: int
 
     def __init__(self, client: HyvesClient, payload: ClientAccountPayload) -> None:
         super().__init__(client, payload)
@@ -166,4 +165,3 @@ class ClientAccount(BaseAccount):
         self.ban_reason = payload.banReason
         self.banned_at = payload.bannedAt
         self.banned_until = payload.bannedUntil
-        self.unread_notification_count = payload.unreadNotificationCount

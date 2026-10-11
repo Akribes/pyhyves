@@ -40,11 +40,13 @@ class ClientAccount(BaseModel):
     jobTitle: str | None = None
     interests: list[str] = Field(default_factory=list)
     slug: str
-    unreadNotificationCount: int
+    unreadNotificationCount: int | None = None  # Not present when updating profile
 
 class ClientAccountPatchParams(BaseModel):
     bio: str | None = None
     city: str | None = None
+    deleteImage: bool = False
+    deleteBanner: bool = False
     primaryColor: Color | None = None
     secondaryColor: Color | None = None
     backgroundColor: Color | None = None
@@ -281,6 +283,9 @@ class GroupPatchParams(BaseModel):
     deleteBanner: bool = False
     name: str | None = None
     description: str | None = None
+    roleToPost: GroupRole | None = None
+    likesOnPostEnabled: bool | None = None  # Must be unset if roleToPost is member
+    commentsOnPostEnabled: bool | None = None
 
 class GroupMember(BaseModel):
     id: int

@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from pyhyves.api.client import HyvesClient
 from pyhyves.api.schema import (
+    ClientAccountPatchParams,
     GroupCreateParams,
     GroupRole,
     GroupVisibility,
     PostCreateParams,
 )
 from pyhyves.auth import HyvesOAuth2Client, PasswordCredentials, TokenCredentials
+from pyhyves.util import KEEP_CURRENT
 
 if TYPE_CHECKING:
     from pyhyves.account import Account, AccountId, AccountRef, ClientAccount
@@ -66,6 +68,44 @@ class Pyhyves:
             Het profiel van de ingelogde gebruiker.
         """
         payload = await self._client.get_client_account()
+        return self._client.build_client_account(payload)
+
+
+    async def edit_client_account(
+        self,
+        *,
+        bio: str | None = KEEP_CURRENT,
+        city: str | None = KEEP_CURRENT,
+        primary_color: str | None = KEEP_CURRENT,
+        secondary_color: str | None = KEEP_CURRENT,
+        background_color: str | None = KEEP_CURRENT,
+    ) -> ClientAccount:
+        """Wijzigt het profiel van de ingelogde gebruiker.
+
+        Alleen de parameters die je meegeeft worden naar de Hyves-API gestuurd.
+        Geef je `None` mee, dan wordt dat veld geleegd.
+
+        Args:
+            bio: Een nieuwe bio.
+            city: Een nieuwe woonplaats.
+            primary_color: Een nieuwe primaire kleur, in het formaat `#AARRGGBB`.
+                Hyves gebruikt alleen `AA` = `FF`.
+            secondary_color: Een nieuwe secundaire kleur.
+            background_color: Een nieuwe achtergrondkleur.
+
+        Returns:
+            Je profiel, met de nieuwe gegevens.
+        """
+        given = {
+            "bio": bio,
+            "city": city,
+            "primaryColor": primary_color,
+            "secondaryColor": secondary_color,
+            "backgroundColor": background_color,
+        }
+        data: dict[str, Any] = {key: value for key, value in given.items() if value is not KEEP_CURRENT}
+        params = ClientAccountPatchParams(**data)
+        payload = await self._client.update_client_account(params)
         return self._client.build_client_account(payload)
 
     def get_account_ref(self, account_id: AccountId) -> AccountRef:
