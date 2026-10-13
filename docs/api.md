@@ -36,6 +36,8 @@
 
 ::: pyhyves.HyvesAuthException
 
+::: pyhyves.HyvesResponseValidationError
+
 ## Accounts
 
 ::: pyhyves.AccountRef
