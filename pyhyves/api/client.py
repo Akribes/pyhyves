@@ -2,7 +2,7 @@ import logging
 from collections.abc import AsyncIterator, Mapping
 from typing import Any, assert_never, overload
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, ValidationError
 
 from pyhyves.account import (
     Account,
@@ -110,6 +110,11 @@ class BatchedResult(BaseModel):
 class HyvesAPIException(RuntimeError):
     """Een fout vanuit de Hyves-API."""
 
+
+class HyvesResponseValidationError(RuntimeError):
+    """Een fout bij het valideren van de response van de Hyves-API."""
+
+
 class HTTPClient:
     """Wrapper om `httpx2.AsyncClient` met authenticatie en validatie."""
 
@@ -144,6 +149,7 @@ class HTTPClient:
 
         Raises:
             HyvesAPIException: Als de Hyves-API een fout teruggeeft.
+            HyvesResponseValidationError: Als de respons van de Hyves-API niet kan worden gevalideerd.
         """
 
         url = HYVES_API_URL + endpoint
@@ -163,16 +169,18 @@ class HTTPClient:
             json=data_dump,
         )
 
-        formatted = HyvesResponse.model_validate(response.json())
+        try:
+            formatted = HyvesResponse.model_validate(response.json())
+            self._classify_errors(formatted)
+            return response_type.model_validate(formatted.result)
+        except ValidationError as e:
+            raise HyvesResponseValidationError("Couldn't parse the response from the Hyves API. This is likely a bug in Pyhyves!") from e
 
-        if not formatted.hasResult:
-            raise HyvesAPIException(f"Hyves API returned {len(formatted.errors)} error(s): {formatted.errors}")
-
-        if formatted.errors:
-            logger.warning(f"Got a result from the Hyves API, but also received errors: {formatted.errors}")
-
-        result = response_type.model_validate(formatted.result)
-        return result
+    def _classify_errors(self, response: HyvesResponse) -> None:
+        if not response.hasResult:
+            raise HyvesAPIException(f"Hyves API returned {len(response.errors)} error(s): {response.errors}")
+        if response.errors:
+            logger.warning(f"Got a result from the Hyves API, but also received errors: {response.errors}")
 
     async def get[T: BaseModel](
         self,

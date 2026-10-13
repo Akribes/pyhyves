@@ -1,6 +1,6 @@
 """Python-client voor de Hyves-API."""
 
-from pyhyves.api.client import HyvesAPIException
+from pyhyves.api.client import HyvesAPIException, HyvesResponseValidationError
 
 from .account import (
     Account,
@@ -60,6 +60,7 @@ __all__ = (
     "GroupVisibility",
     "HyvesAPIException",
     "HyvesAuthException",
+    "HyvesResponseValidationError",
     "PasswordCredentials",
     "Post",
     "PostId",

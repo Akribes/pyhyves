@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from pyhyves.api.client import HTTPClient
+from pyhyves.api.client import HTTPClient, HyvesResponseValidationError
 from pyhyves.auth import HyvesAuthException, HyvesOAuth2Client, TokenCredentials
 
 API_URL = "https://api.hyves.nl"
@@ -116,3 +116,25 @@ class TestHTTPClient:
                 await client.get("/v1/fake-endpoint", response_type=NestedDummy)
 
         assert not api.calls
+
+    @pytest.mark.asyncio
+    async def test_raises_on_invalid_response(self, httpx2_mock):
+        httpx2_mock.get(f"{API_URL}/v1/fake-endpoint").respond(200, json={"not a standard response": True})
+
+        async with HyvesOAuth2Client() as oauth:
+            client = HTTPClient(oauth)
+            with pytest.raises(HyvesResponseValidationError):
+                await client.get("/v1/fake-endpoint", response_type=Dummy, auth_required=False)
+
+    @pytest.mark.asyncio
+    async def test_raises_on_invalid_response_result(self, httpx2_mock):
+        httpx2_mock.get(f"{API_URL}/v1/fake-endpoint").respond(200, json={
+            "hasResult": True,
+            "errors": [],
+            "result": "not a standard response"
+        })
+
+        async with HyvesOAuth2Client() as oauth:
+            client = HTTPClient(oauth)
+            with pytest.raises(HyvesResponseValidationError):
+                await client.get("/v1/fake-endpoint", response_type=Dummy, auth_required=False)
