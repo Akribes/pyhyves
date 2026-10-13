@@ -226,6 +226,15 @@ class GroupRole(StrEnum):
     OWNER = "owner"
     """Groepseigenaar."""
 
+    MANAGER = "manager"
+    """Beheerder."""
+
+    MODERATOR = "moderator"
+    """Moderator."""
+
+    CONTRIBUTOR = "contributor"
+    """Bijdrager."""
+
     MEMBER = "member"
     """Lid."""
 
